@@ -1,8 +1,10 @@
 class_name AnimalSpawner
 extends Node3D
 
-const MIN_ANIMALS := 5
-const MAX_ANIMALS := 10
+const MIN_ANIMALS_PER_TYPE := 6
+const MAX_ANIMALS_PER_TYPE := 10
+const MIN_ANIMALS := MIN_ANIMALS_PER_TYPE * 2
+const MAX_ANIMALS := MAX_ANIMALS_PER_TYPE * 2
 const SPAWN_SEED := 20260817
 const SPAWN_SAFE_RADIUS := 14.0
 const WORLD_MARGIN := 8
@@ -12,6 +14,8 @@ var world: VoxelWorld
 var player: FirstPersonPlayer
 var animals: Array[SimpleAnimal] = []
 var requested_animal_count := 0
+var requested_pig_count := 0
+var requested_chicken_count := 0
 var pig_count := 0
 var chicken_count := 0
 var spawn_cells: Array[Vector3i] = []
@@ -28,19 +32,26 @@ func _ready() -> void:
 func spawn_animals() -> void:
 	clear_animals()
 	rng.seed = SPAWN_SEED
-	requested_animal_count = rng.randi_range(MIN_ANIMALS, MAX_ANIMALS)
+	requested_pig_count = rng.randi_range(MIN_ANIMALS_PER_TYPE, MAX_ANIMALS_PER_TYPE)
+	requested_chicken_count = rng.randi_range(MIN_ANIMALS_PER_TYPE, MAX_ANIMALS_PER_TYPE)
+	requested_animal_count = requested_pig_count + requested_chicken_count
+	_spawn_type(SimpleAnimal.AnimalType.PIG, requested_pig_count, SPAWN_SEED + 1103)
+	_spawn_type(SimpleAnimal.AnimalType.CHICKEN, requested_chicken_count, SPAWN_SEED + 2207)
+	if pig_count < MIN_ANIMALS_PER_TYPE or chicken_count < MIN_ANIMALS_PER_TYPE:
+		push_error("动物安全生成点不足，当前猪%d只、鸡%d只" % [pig_count, chicken_count])
+
+
+func _spawn_type(type: SimpleAnimal.AnimalType, target_count: int, seed_offset: int) -> void:
+	var spawned_before := animals.size()
 	var attempts := 0
-	while animals.size() < requested_animal_count and attempts < MAX_PLACEMENT_ATTEMPTS:
+	while animals.size() - spawned_before < target_count and attempts < MAX_PLACEMENT_ATTEMPTS:
 		attempts += 1
 		var x := rng.randi_range(-VoxelWorld.WORLD_WIDTH / 2 + WORLD_MARGIN, VoxelWorld.WORLD_WIDTH / 2 - WORLD_MARGIN - 1)
 		var z := rng.randi_range(-VoxelWorld.WORLD_DEPTH / 2 + WORLD_MARGIN, VoxelWorld.WORLD_DEPTH / 2 - WORLD_MARGIN - 1)
 		var cell := Vector3i(x, world.get_surface_height(x, z) + 1, z)
 		if not is_spawn_cell_safe(cell):
 			continue
-		var type := SimpleAnimal.AnimalType.PIG if rng.randf() < 0.5 else SimpleAnimal.AnimalType.CHICKEN
-		_spawn_one(cell, type, SPAWN_SEED + attempts * 97)
-	if animals.size() < MIN_ANIMALS:
-		push_error("动物安全生成点不足，仅生成 %d 只" % animals.size())
+		_spawn_one(cell, type, seed_offset + attempts * 97)
 
 
 func clear_animals() -> void:
@@ -49,6 +60,9 @@ func clear_animals() -> void:
 			animal.queue_free()
 	animals.clear()
 	spawn_cells.clear()
+	requested_animal_count = 0
+	requested_pig_count = 0
+	requested_chicken_count = 0
 	pig_count = 0
 	chicken_count = 0
 

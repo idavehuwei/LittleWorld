@@ -7,6 +7,7 @@ const HOTBAR_GAP := 8
 
 var inventory: PlayerInventory
 var crafting_grid: CraftingGrid
+var game_audio_system: GameAudioSystem
 var title_label: Label
 var selected_label: Label
 var crosshair: Control
@@ -31,11 +32,16 @@ var crafting_status: Label
 var recipe_candidates: VBoxContainer
 var recipe_candidate_buttons: Array[Button] = []
 var held_slot_index := -1
+var master_volume_slider: HSlider
+var music_volume_slider: HSlider
+var sfx_volume_slider: HSlider
+var volume_value_labels: Dictionary = {}
 
 
 func _ready() -> void:
 	assert(inventory != null, "GameHUD 需要在进入场景树前设置 inventory")
 	assert(crafting_grid != null, "GameHUD 需要在进入场景树前设置 crafting_grid")
+	assert(game_audio_system != null, "GameHUD 需要在进入场景树前设置 game_audio_system")
 	_build_ui()
 	inventory.slot_changed.connect(_on_slot_changed)
 	inventory.selection_changed.connect(_on_selection_changed)
@@ -163,7 +169,8 @@ func _build_inventory_panel(root: Control) -> void:
 	root.add_child(inventory_panel)
 
 	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 20)
+	# 新增音量区后收紧纵向间距，确保所有内容仍完整容纳在 1020×780 面板内。
+	content.add_theme_constant_override("separation", 12)
 	inventory_panel.add_child(content)
 	inventory_title = Label.new()
 	inventory_title.text = "背包  ·  36 格"
@@ -171,6 +178,7 @@ func _build_inventory_panel(root: Control) -> void:
 	inventory_title.add_theme_font_size_override("font_size", 30)
 	content.add_child(inventory_title)
 	_build_crafting_ui(content)
+	_build_audio_settings(content)
 
 	var separator := HSeparator.new()
 	content.add_child(separator)
@@ -193,6 +201,74 @@ func _build_inventory_panel(root: Control) -> void:
 		inventory_icons.append(slot["icon"] as TextureRect)
 		inventory_counts.append(slot["count"] as Label)
 	inventory_panel.visible = false
+
+
+func _build_audio_settings(content: VBoxContainer) -> void:
+	var settings_panel := PanelContainer.new()
+	settings_panel.name = "AudioSettings"
+	var settings_style := StyleBoxFlat.new()
+	settings_style.bg_color = Color(0.15, 0.14, 0.12, 0.96)
+	settings_style.border_color = Color(0.42, 0.35, 0.25, 0.9)
+	settings_style.set_border_width_all(2)
+	settings_style.set_corner_radius_all(7)
+	settings_style.content_margin_left = 18
+	settings_style.content_margin_right = 18
+	settings_style.content_margin_top = 12
+	settings_style.content_margin_bottom = 12
+	settings_panel.add_theme_stylebox_override("panel", settings_style)
+	content.add_child(settings_panel)
+
+	var settings_row := HBoxContainer.new()
+	settings_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	settings_row.add_theme_constant_override("separation", 24)
+	settings_panel.add_child(settings_row)
+	var heading := Label.new()
+	heading.text = "音量"
+	heading.add_theme_font_size_override("font_size", 21)
+	settings_row.add_child(heading)
+	master_volume_slider = _create_volume_control(settings_row, "主音量", &"master", game_audio_system.get_master_volume())
+	music_volume_slider = _create_volume_control(settings_row, "音乐", &"music", game_audio_system.get_music_volume())
+	sfx_volume_slider = _create_volume_control(settings_row, "音效", &"sfx", game_audio_system.get_sfx_volume())
+
+
+func _create_volume_control(parent: HBoxContainer, label_text: String, key: StringName, initial_value: float) -> HSlider:
+	var group := HBoxContainer.new()
+	group.add_theme_constant_override("separation", 8)
+	parent.add_child(group)
+	var label := Label.new()
+	label.text = label_text
+	label.custom_minimum_size = Vector2(62, 0)
+	label.add_theme_font_size_override("font_size", 17)
+	group.add_child(label)
+	var slider := HSlider.new()
+	slider.name = "%sVolumeSlider" % label_text
+	slider.custom_minimum_size = Vector2(145, 28)
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 1.0
+	slider.value = initial_value * 100.0
+	slider.value_changed.connect(_on_volume_slider_changed.bind(key))
+	group.add_child(slider)
+	var value_label := Label.new()
+	value_label.custom_minimum_size = Vector2(48, 0)
+	value_label.text = "%d%%" % roundi(slider.value)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	group.add_child(value_label)
+	volume_value_labels[key] = value_label
+	return slider
+
+
+func _on_volume_slider_changed(value: float, key: StringName) -> void:
+	var linear_value := value / 100.0
+	if key == &"master":
+		game_audio_system.set_master_volume(linear_value)
+	elif key == &"music":
+		game_audio_system.set_music_volume(linear_value)
+	else:
+		game_audio_system.set_sfx_volume(linear_value)
+	var value_label := volume_value_labels.get(key) as Label
+	if value_label != null:
+		value_label.text = "%d%%" % roundi(value)
 
 
 func _build_crafting_ui(content: VBoxContainer) -> void:

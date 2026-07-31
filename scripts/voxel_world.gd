@@ -72,6 +72,8 @@ var generated_tree_count := 0
 var generated_flower_count := 0
 var tree_origins: Array[Vector3i] = []
 var flower_cells: Array[Vector3i] = []
+var modified_blocks: Dictionary = {}
+var tracking_changes := false
 
 
 func _ready() -> void:
@@ -97,6 +99,8 @@ func build_natural_world(width: int, depth: int) -> void:
 	_generate_height_map(width, depth)
 	_fill_terrain_layers(width, depth)
 	_scatter_natural_decorations(width, depth)
+	modified_blocks.clear()
+	tracking_changes = true
 
 
 func build_flat_world(width: int, depth: int) -> void:
@@ -144,6 +148,8 @@ func set_block(cell: Vector3i, block_type: int) -> bool:
 	if previous_type == block_type:
 		return false
 	set_cell_item(cell, block_type)
+	if tracking_changes:
+		modified_blocks[cell] = block_type
 	block_changed.emit(cell, previous_type, block_type)
 	return true
 
@@ -158,6 +164,39 @@ func place_block(cell: Vector3i, block_type: int) -> bool:
 	if has_block(cell):
 		return false
 	return set_block(cell, block_type)
+
+
+func serialize_modified_blocks() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var cells: Array[Vector3i] = []
+	for key: Variant in modified_blocks.keys():
+		cells.append(key as Vector3i)
+	cells.sort_custom(func(first: Vector3i, second: Vector3i) -> bool:
+		if first.x != second.x:
+			return first.x < second.x
+		if first.y != second.y:
+			return first.y < second.y
+		return first.z < second.z
+	)
+	for cell: Vector3i in cells:
+		result.append({"x": cell.x, "y": cell.y, "z": cell.z, "type": modified_blocks[cell] as int})
+	return result
+
+
+func apply_modified_blocks(entries: Array) -> void:
+	var was_tracking := tracking_changes
+	tracking_changes = false
+	modified_blocks.clear()
+	for entry_value: Variant in entries:
+		var entry := entry_value as Dictionary
+		if not entry.has("x") or not entry.has("y") or not entry.has("z") or not entry.has("type"):
+			continue
+		var cell := Vector3i(int(entry["x"]), int(entry["y"]), int(entry["z"]))
+		var block_type := int(entry["type"])
+		if block_type == AIR or BLOCK_NAMES.has(block_type):
+			set_cell_item(cell, block_type)
+			modified_blocks[cell] = block_type
+	tracking_changes = was_tracking
 
 
 func set_highlight(cell: Vector3i, visible: bool) -> void:

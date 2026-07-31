@@ -13,6 +13,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEXTURE_DIR = ROOT / "assets" / "textures" / "blocks"
 AUDIO_DIR = ROOT / "assets" / "audio" / "sfx"
+AMBIENT_DIR = ROOT / "assets" / "audio" / "ambient"
+MUSIC_DIR = ROOT / "assets" / "audio" / "music"
 SIZE = 16
 SAMPLE_RATE = 22050
 
@@ -247,9 +249,103 @@ def place_sound() -> list[float]:
     return samples
 
 
+def material_impact(material: str, action: str) -> list[float]:
+    seed = sum(ord(char) for char in material + action) + 1200
+    rng = random.Random(seed)
+    duration = 0.26 if action == "break" else 0.16
+    count = round(SAMPLE_RATE * duration)
+    profiles = {
+        "grass": (95.0, 0.72, 0.34),
+        "stone": (220.0, 0.32, 0.78),
+        "wood": (145.0, 0.48, 0.50),
+    }
+    base_frequency, noise_amount, tone_amount = profiles[material]
+    samples: list[float] = []
+    filtered = 0.0
+    decay = 10.0 if action == "break" else 24.0
+    for i in range(count):
+        t = i / SAMPLE_RATE
+        envelope = math.exp(-decay * t)
+        raw = rng.uniform(-1.0, 1.0)
+        smoothing = 0.72 if material == "grass" else (0.25 if material == "stone" else 0.52)
+        filtered = filtered * smoothing + raw * (1.0 - smoothing)
+        frequency = base_frequency * (1.0 - 0.18 * t)
+        tone = math.sin(2.0 * math.pi * frequency * t)
+        if material == "stone":
+            tone += 0.45 * math.sin(2.0 * math.pi * frequency * 2.73 * t)
+        elif material == "wood":
+            tone += 0.32 * math.sin(2.0 * math.pi * frequency * 1.52 * t)
+        impulse = rng.uniform(-1.0, 1.0) * math.exp(-95.0 * t)
+        samples.append((filtered * noise_amount + tone * tone_amount + impulse * 0.22) * envelope * 0.64)
+    return samples
+
+
+def footstep_sound(material: str) -> list[float]:
+    samples = material_impact(material, "place")
+    return [sample * 0.72 for sample in samples]
+
+
+def wind_loop() -> list[float]:
+    rng = random.Random(1501)
+    duration = 8.0
+    count = round(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    low = 0.0
+    slower = 0.0
+    for i in range(count):
+        t = i / SAMPLE_RATE
+        raw = rng.uniform(-1.0, 1.0)
+        low = low * 0.985 + raw * 0.015
+        slower = slower * 0.998 + low * 0.002
+        gust = 0.52 + 0.25 * math.sin(2.0 * math.pi * 0.11 * t) + 0.16 * math.sin(2.0 * math.pi * 0.037 * t)
+        fade = min(1.0, t / 0.5, (duration - t) / 0.5)
+        samples.append((low * 0.52 + slower * 1.8) * gust * max(0.0, fade))
+    return samples
+
+
+def bird_chirp() -> list[float]:
+    duration = 1.2
+    count = round(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    for i in range(count):
+        t = i / SAMPLE_RATE
+        value = 0.0
+        for start, length, base in ((0.05, 0.18, 1650.0), (0.33, 0.16, 1950.0), (0.62, 0.24, 1480.0)):
+            dt = t - start
+            if 0.0 <= dt <= length:
+                envelope = math.sin(math.pi * dt / length) ** 2
+                frequency = base + 420.0 * math.sin(math.pi * dt / length)
+                value += math.sin(2.0 * math.pi * frequency * dt) * envelope
+        samples.append(value * 0.28)
+    return samples
+
+
+def ambient_music() -> list[float]:
+    duration = 16.0
+    count = round(SAMPLE_RATE * duration)
+    samples: list[float] = []
+    chord_frequencies = (130.81, 164.81, 196.00, 246.94)
+    melody = (261.63, 293.66, 329.63, 293.66, 246.94, 261.63, 220.00, 246.94)
+    for i in range(count):
+        t = i / SAMPLE_RATE
+        pad = 0.0
+        for index, frequency in enumerate(chord_frequencies):
+            pad += math.sin(2.0 * math.pi * frequency * t + index * 0.7) * (0.12 / (index + 1))
+        note_index = int(t / 2.0) % len(melody)
+        note_t = t % 2.0
+        melody_envelope = math.sin(math.pi * min(1.0, note_t / 1.8)) ** 2
+        lead = math.sin(2.0 * math.pi * melody[note_index] * t) * melody_envelope * 0.055
+        slow_pulse = 0.82 + 0.18 * math.sin(2.0 * math.pi * t / duration)
+        edge_fade = min(1.0, t / 1.0, (duration - t) / 1.0)
+        samples.append((pad + lead) * slow_pulse * max(0.0, edge_fade))
+    return samples
+
+
 def main() -> None:
     TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    AMBIENT_DIR.mkdir(parents=True, exist_ok=True)
+    MUSIC_DIR.mkdir(parents=True, exist_ok=True)
     textures = {
         "grass.png": grass_texture(),
         "dirt.png": dirt_texture(),
@@ -265,7 +361,14 @@ def main() -> None:
         write_png(TEXTURE_DIR / filename, pixels)
     write_wav(AUDIO_DIR / "block_break.wav", break_sound())
     write_wav(AUDIO_DIR / "block_place.wav", place_sound())
-    print(f"Generated {len(textures)} textures and 2 sound effects in {ROOT}")
+    for material in ("grass", "stone", "wood"):
+        write_wav(AUDIO_DIR / f"break_{material}.wav", material_impact(material, "break"))
+        write_wav(AUDIO_DIR / f"place_{material}.wav", material_impact(material, "place"))
+        write_wav(AUDIO_DIR / f"step_{material}.wav", footstep_sound(material))
+    write_wav(AMBIENT_DIR / "wind_loop.wav", wind_loop())
+    write_wav(AMBIENT_DIR / "bird_chirp.wav", bird_chirp())
+    write_wav(MUSIC_DIR / "little_world_theme.wav", ambient_music())
+    print(f"Generated {len(textures)} textures and 14 audio assets in {ROOT}")
 
 
 if __name__ == "__main__":

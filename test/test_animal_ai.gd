@@ -44,8 +44,11 @@ func _on_physics_frame() -> void:
 
 func _test_spawn_population() -> void:
 	_expect(spawner != null, "主场景创建Animals生成管理器")
-	_expect(spawner.animals.size() >= AnimalSpawner.MIN_ANIMALS and spawner.animals.size() <= AnimalSpawner.MAX_ANIMALS, "世界生成后随机创建5–10只动物")
-	_expect(spawner.animals.size() == spawner.requested_animal_count, "实际动物数量与固定种子请求数量一致")
+	_expect(spawner.animals.size() >= AnimalSpawner.MIN_ANIMALS and spawner.animals.size() <= AnimalSpawner.MAX_ANIMALS, "世界生成后总计创建12–20只动物")
+	_expect(spawner.pig_count >= AnimalSpawner.MIN_ANIMALS_PER_TYPE and spawner.pig_count <= AnimalSpawner.MAX_ANIMALS_PER_TYPE, "猪单独生成6–10只")
+	_expect(spawner.chicken_count >= AnimalSpawner.MIN_ANIMALS_PER_TYPE and spawner.chicken_count <= AnimalSpawner.MAX_ANIMALS_PER_TYPE, "鸡单独生成6–10只")
+	_expect(spawner.pig_count == spawner.requested_pig_count and spawner.chicken_count == spawner.requested_chicken_count, "每种动物实际数量与固定种子请求数量一致")
+	_expect(spawner.animals.size() == spawner.requested_animal_count, "实际动物总数与猪鸡请求数量之和一致")
 	_expect(spawner.pig_count + spawner.chicken_count == spawner.animals.size(), "猪鸡分类计数覆盖全部动物")
 	var all_types_valid := true
 	for animal: SimpleAnimal in spawner.animals:
@@ -146,6 +149,7 @@ func _test_deterministic_population() -> void:
 	isolated.player = player
 	root.add_child(isolated)
 	_expect(isolated.requested_animal_count == spawner.requested_animal_count, "固定种子生成一致动物总数")
+	_expect(isolated.requested_pig_count == spawner.requested_pig_count and isolated.requested_chicken_count == spawner.requested_chicken_count, "固定种子生成一致的每种动物目标数量")
 	_expect(isolated.spawn_cells == spawner.spawn_cells, "固定种子生成一致动物地表位置")
 	_expect(isolated.pig_count == spawner.pig_count and isolated.chicken_count == spawner.chicken_count, "固定种子生成一致猪鸡分配")
 	isolated.queue_free()

@@ -171,6 +171,33 @@ func cycle_hotbar(step: int) -> void:
 	select_hotbar(posmod(selected_hotbar_index + step, HOTBAR_SIZE))
 
 
+func serialize_slots() -> Array[Dictionary]:
+	var slots: Array[Dictionary] = []
+	for index: int in range(SLOT_COUNT):
+		slots.append({"item": item_ids[index], "amount": amounts[index]})
+	return slots
+
+
+func restore_slots(slots: Array, selected_index: int) -> void:
+	for index: int in range(SLOT_COUNT):
+		var item_id := EMPTY_ITEM
+		var amount := 0
+		if index < slots.size() and slots[index] is Dictionary:
+			var slot := slots[index] as Dictionary
+			item_id = int(slot.get("item", EMPTY_ITEM))
+			amount = int(slot.get("amount", 0))
+		if amount > 0 and ItemCatalog.is_valid_item(item_id):
+			item_ids[index] = item_id
+			amounts[index] = mini(amount, ItemCatalog.stack_limit(item_id))
+		else:
+			item_ids[index] = EMPTY_ITEM
+			amounts[index] = 0
+		slot_changed.emit(index)
+	selected_hotbar_index = clampi(selected_index, 0, HOTBAR_SIZE - 1)
+	selection_changed.emit(selected_hotbar_index)
+	inventory_changed.emit()
+
+
 func clear() -> void:
 	for index: int in range(SLOT_COUNT):
 		item_ids[index] = EMPTY_ITEM
