@@ -36,17 +36,18 @@ func _on_physics_frame() -> void:
 
 
 func _test_block_types_and_slots() -> void:
-	_expect(FirstPersonPlayer.BLOCK_SLOTS.size() == 5, "快捷栏包含五种方块")
-	_expect(FirstPersonPlayer.BLOCK_SLOTS[4] == VoxelWorld.BRICKS, "第五格是砖块")
+	_expect(PlayerInventory.HOTBAR_SIZE == 9, "快捷栏包含九个槽位")
+	_expect(player.inventory.get_item(4) == VoxelWorld.BRICKS, "第五格初始是砖块")
 	_expect(VoxelWorld.BLOCK_NAMES[VoxelWorld.BRICKS] == "砖块", "世界注册了砖块类型")
-	_expect(hud.slot_panels.size() == 5, "HUD 显示五个槽位")
+	_expect(hud.slot_panels.size() == 9, "HUD 显示九个快捷栏槽位")
 
 	player.select_slot(4)
 	_expect(player.selected_block == VoxelWorld.BRICKS, "数字键槽位逻辑可选择砖块")
+	player.select_slot(8)
 	player.cycle_slot(1)
-	_expect(player.selected_block == VoxelWorld.GRASS, "滚轮向下可从第五格循环到第一格")
+	_expect(player.selected_block == VoxelWorld.GRASS, "滚轮向下可从第九格循环到第一格")
 	player.cycle_slot(-1)
-	_expect(player.selected_block == VoxelWorld.BRICKS, "滚轮向上可从第一格循环到第五格")
+	_expect(player.inventory.selected_hotbar_index == 8, "滚轮向上可从第一格循环到第九格")
 
 
 func _test_no_target_rejection() -> void:

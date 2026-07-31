@@ -4,6 +4,7 @@ var world: VoxelWorld
 var player: FirstPersonPlayer
 var day_night_cycle: DayNightCycle
 var block_audio_manager: BlockAudioManager
+var inventory: PlayerInventory
 
 
 func _ready() -> void:
@@ -24,16 +25,22 @@ func _ready() -> void:
 	block_audio_manager.world = world
 	add_child(block_audio_manager)
 
+	inventory = PlayerInventory.new()
+	inventory.seed_demo_items()
+
 	player = FirstPersonPlayer.new()
 	player.name = "Player"
 	player.world = world
+	player.inventory = inventory
 	player.position = Vector3(0.0, 2.0, 5.0)
 	add_child(player)
 
 	var hud := GameHUD.new()
 	hud.name = "HUD"
+	hud.inventory = inventory
 	add_child(hud)
 	player.selection_changed.connect(hud.set_selected_block)
+	player.inventory_visibility_changed.connect(hud.set_inventory_open)
 	hud.set_selected_block(player.selected_block)
 
 
@@ -54,6 +61,11 @@ func _register_inputs() -> void:
 	_bind_key(&"slot_3", KEY_3)
 	_bind_key(&"slot_4", KEY_4)
 	_bind_key(&"slot_5", KEY_5)
+	_bind_key(&"slot_6", KEY_6)
+	_bind_key(&"slot_7", KEY_7)
+	_bind_key(&"slot_8", KEY_8)
+	_bind_key(&"slot_9", KEY_9)
+	_bind_key(&"toggle_inventory", KEY_E)
 
 
 func _bind_key(action: StringName, keycode: Key) -> void:

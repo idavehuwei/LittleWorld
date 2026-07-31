@@ -2,6 +2,7 @@ class_name FirstPersonPlayer
 extends CharacterBody3D
 
 signal selection_changed(block_type: int)
+signal inventory_visibility_changed(is_open: bool)
 
 const BODY_HEIGHT := 1.80
 const BODY_RADIUS := 0.35
@@ -15,9 +16,10 @@ const MAX_LOOK_ANGLE := deg_to_rad(89.0)
 const REACH := 8.0
 const WORLD_COLLISION_LAYER := 1
 const PLAYER_COLLISION_LAYER := 2
-const BLOCK_SLOTS := [VoxelWorld.GRASS, VoxelWorld.DIRT, VoxelWorld.STONE, VoxelWorld.PLANKS, VoxelWorld.BRICKS]
+const HOTBAR_SIZE := PlayerInventory.HOTBAR_SIZE
 
 var world: VoxelWorld
+var inventory: PlayerInventory
 var selected_block: int = VoxelWorld.GRASS
 var head: Node3D
 var camera: Camera3D
@@ -26,23 +28,32 @@ var gravity: float = 18.0
 var target_cell := Vector3i.ZERO
 var target_normal := Vector3i.ZERO
 var has_target := false
+var inventory_open := false
 
 
 func _ready() -> void:
+	assert(inventory != null, "FirstPersonPlayer 需要在进入场景树前设置 inventory")
 	collision_layer = PLAYER_COLLISION_LAYER
 	collision_mask = WORLD_COLLISION_LAYER
 	floor_stop_on_slope = true
 	floor_snap_length = 0.12
 	_build_body()
+	inventory.selection_changed.connect(_on_inventory_selection_changed)
+	_sync_selected_item()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _physics_process(delta: float) -> void:
 	_apply_gravity(delta)
-	_try_jump()
-	_apply_horizontal_movement(delta)
+	if not inventory_open:
+		_try_jump()
+		_apply_horizontal_movement(delta)
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, GROUND_ACCELERATION * delta)
+		velocity.z = move_toward(velocity.z, 0.0, GROUND_ACCELERATION * delta)
 	move_and_slide()
-	update_target_block()
+	if not inventory_open:
+		update_target_block()
 
 
 func _apply_gravity(delta: float) -> void:
@@ -68,7 +79,20 @@ func _apply_horizontal_movement(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key_event := event as InputEventKey
+		if key_event.keycode == KEY_E:
+			set_inventory_open(not inventory_open)
+			return
+		if inventory_open:
+			return
+		if key_event.keycode == KEY_ESCAPE:
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		elif key_event.keycode >= KEY_1 and key_event.keycode <= KEY_9:
+			select_slot(int(key_event.keycode - KEY_1))
+	elif inventory_open:
+		return
+	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var motion := event as InputEventMouseMotion
 		apply_look_delta(motion.relative)
 	elif event is InputEventMouseButton:
@@ -85,12 +109,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				cycle_slot(-1)
 			elif mouse_button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 				cycle_slot(1)
-	elif event is InputEventKey and event.pressed and not event.echo:
-		var key_event := event as InputEventKey
-		if key_event.keycode == KEY_ESCAPE:
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		elif key_event.keycode >= KEY_1 and key_event.keycode <= KEY_5:
-			select_slot(int(key_event.keycode - KEY_1))
 
 
 func apply_look_delta(relative: Vector2) -> void:
@@ -139,22 +157,36 @@ func update_target_block() -> void:
 
 
 func try_break_target_block() -> bool:
-	if not has_target or not world.has_block(target_cell):
+	if inventory_open or not has_target or not world.has_block(target_cell):
 		return false
-	var removed := world.remove_block(target_cell)
+	var block_type := world.get_block(target_cell)
+	# 先确认整个掉落可入包，再修改世界，避免背包已满时方块凭空消失。
+	if not inventory.can_add(block_type, 1):
+		return false
+	if not world.remove_block(target_cell):
+		return false
+	var remaining := inventory.add_item(block_type, 1)
+	assert(remaining == 0, "预检查通过后方块应完整进入背包")
 	update_target_block()
-	return removed
+	return true
 
 
 func try_place_target_block() -> bool:
-	if not has_target or not is_valid_face_normal(target_normal):
+	if inventory_open or not has_target or not is_valid_face_normal(target_normal):
+		return false
+	var selected_item := inventory.selected_item()
+	if selected_item == PlayerInventory.EMPTY_ITEM or inventory.selected_amount() <= 0:
 		return false
 	var place_cell := target_cell + target_normal
 	if world.has_block(place_cell) or cell_overlaps_player(place_cell):
 		return false
-	var placed := world.place_block(place_cell, selected_block)
+	if not world.place_block(place_cell, selected_item):
+		return false
+	var consumed := inventory.remove_from_slot(inventory.selected_hotbar_index, 1)
+	assert(consumed, "成功放置后必须能消耗已预检查的快捷栏物品")
+	_sync_selected_item()
 	update_target_block()
-	return placed
+	return true
 
 
 func is_valid_face_normal(normal: Vector3i) -> bool:
@@ -179,12 +211,28 @@ func cell_overlaps_player(cell: Vector3i) -> bool:
 
 
 func cycle_slot(step: int) -> void:
-	var current_index := BLOCK_SLOTS.find(selected_block)
-	select_slot(posmod(current_index + step, BLOCK_SLOTS.size()))
+	inventory.cycle_hotbar(step)
+	_sync_selected_item()
 
 
 func select_slot(index: int) -> void:
-	if index < 0 or index >= BLOCK_SLOTS.size():
-		return
-	selected_block = BLOCK_SLOTS[index]
+	if inventory.select_hotbar(index):
+		_sync_selected_item()
+
+
+func set_inventory_open(is_open: bool) -> void:
+	inventory_open = is_open
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if inventory_open else Input.MOUSE_MODE_CAPTURED
+	if inventory_open:
+		has_target = false
+		world.set_highlight(target_cell, false)
+	inventory_visibility_changed.emit(inventory_open)
+
+
+func _on_inventory_selection_changed(_index: int) -> void:
+	_sync_selected_item()
+
+
+func _sync_selected_item() -> void:
+	selected_block = inventory.selected_item()
 	selection_changed.emit(selected_block)
