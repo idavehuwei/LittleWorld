@@ -1,11 +1,14 @@
 class_name VoxelWorld
 extends GridMap
 
+signal block_changed(cell: Vector3i, previous_type: int, new_type: int)
+
 const AIR := -1
 const GRASS := 0
 const DIRT := 1
 const STONE := 2
 const PLANKS := 3
+const BRICKS := 4
 
 const WORLD_WIDTH := 250
 const WORLD_DEPTH := 250
@@ -18,6 +21,7 @@ const BLOCK_NAMES := {
 	DIRT: "泥土",
 	STONE: "石头",
 	PLANKS: "木板",
+	BRICKS: "砖块",
 }
 
 const BLOCK_COLORS := {
@@ -25,6 +29,7 @@ const BLOCK_COLORS := {
 	DIRT: Color("8a5a36"),
 	STONE: Color("8a9098"),
 	PLANKS: Color("c98b4b"),
+	BRICKS: Color("b5523b"),
 }
 
 var highlight: MeshInstance3D
@@ -61,20 +66,27 @@ func has_block(cell: Vector3i) -> bool:
 	return get_block(cell) != AIR
 
 
+func set_block(cell: Vector3i, block_type: int) -> bool:
+	if block_type != AIR and not BLOCK_NAMES.has(block_type):
+		return false
+	var previous_type := get_block(cell)
+	if previous_type == block_type:
+		return false
+	set_cell_item(cell, block_type)
+	block_changed.emit(cell, previous_type, block_type)
+	return true
+
+
 func remove_block(cell: Vector3i) -> bool:
 	if not has_block(cell):
 		return false
-	set_cell_item(cell, AIR)
-	return true
+	return set_block(cell, AIR)
 
 
 func place_block(cell: Vector3i, block_type: int) -> bool:
 	if has_block(cell):
 		return false
-	if not BLOCK_NAMES.has(block_type):
-		return false
-	set_cell_item(cell, block_type)
-	return true
+	return set_block(cell, block_type)
 
 
 func set_highlight(cell: Vector3i, visible: bool) -> void:
@@ -121,6 +133,12 @@ func _create_block_material(block_type: int) -> StandardMaterial3D:
 			)
 			if block_type == PLANKS and y % 5 == 0:
 				color = color.darkened(0.20)
+			if block_type == BRICKS:
+				var mortar_row := y % 6 == 0
+				var row_offset := 4 if (y / 6 as int) % 2 == 1 else 0
+				var mortar_column := (x + row_offset) % 8 == 0
+				if mortar_row or mortar_column:
+					color = Color("d3b09b")
 			if block_type == GRASS and y > 11:
 				color = color.darkened(0.10)
 			image.set_pixel(x, y, color)
