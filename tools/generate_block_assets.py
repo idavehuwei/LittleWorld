@@ -131,6 +131,42 @@ def bricks_texture() -> list[list[tuple[int, int, int, int]]]:
     return pixels
 
 
+def log_texture() -> list[list[tuple[int, int, int, int]]]:
+    rng = random.Random(801)
+    pixels: list[list[tuple[int, int, int, int]]] = []
+    center = (SIZE - 1) * 0.5
+    for y in range(SIZE):
+        row = []
+        for x in range(SIZE):
+            distance = max(abs(x - center), abs(y - center))
+            ring = int(distance) % 3 == 0
+            base = (139, 88, 43) if ring else (177, 119, 61)
+            row.append(shade(base, 1.0 + rng.uniform(-0.07, 0.07)))
+        pixels.append(row)
+    for x in range(SIZE):
+        pixels[0][x] = (91, 55, 29, 255)
+        pixels[SIZE - 1][x] = (91, 55, 29, 255)
+    for y in range(SIZE):
+        pixels[y][0] = (91, 55, 29, 255)
+        pixels[y][SIZE - 1] = (91, 55, 29, 255)
+    return pixels
+
+
+def crafting_table_texture() -> list[list[tuple[int, int, int, int]]]:
+    pixels = planks_texture()
+    dark = (79, 48, 27, 255)
+    light = (221, 167, 91, 255)
+    for y in (1, 6, 11, 14):
+        for x in range(1, 15):
+            pixels[y][x] = dark
+    for x in (1, 6, 11, 14):
+        for y in range(1, 15):
+            pixels[y][x] = dark
+    for x, y in [(3, 3), (8, 3), (13, 3), (3, 8), (8, 8), (13, 8), (3, 13), (8, 13), (13, 13)]:
+        pixels[y][x] = light
+    return pixels
+
+
 def write_wav(path: Path, samples: list[float]) -> None:
     pcm = bytearray()
     for sample in samples:
@@ -188,6 +224,8 @@ def main() -> None:
         "stone.png": stone_texture(),
         "planks.png": planks_texture(),
         "bricks.png": bricks_texture(),
+        "log.png": log_texture(),
+        "crafting_table.png": crafting_table_texture(),
     }
     for filename, pixels in textures.items():
         write_png(TEXTURE_DIR / filename, pixels)

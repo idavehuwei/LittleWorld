@@ -32,6 +32,7 @@ func seed_demo_items() -> void:
 	]
 	for index: int in range(starter_items.size()):
 		set_slot(index, starter_items[index], ItemCatalog.MAX_STACK)
+	set_slot(5, ItemCatalog.LOG, 8)
 
 
 func is_valid_slot(index: int) -> bool:
@@ -56,6 +57,14 @@ func selected_item() -> int:
 
 func selected_amount() -> int:
 	return get_amount(selected_hotbar_index)
+
+
+func count_item(item_id: int) -> int:
+	var total := 0
+	for index: int in range(SLOT_COUNT):
+		if item_ids[index] == item_id:
+			total += amounts[index]
+	return total
 
 
 func set_slot(index: int, item_id: int, amount: int) -> bool:
