@@ -15,7 +15,7 @@ const MAX_LOOK_ANGLE := deg_to_rad(89.0)
 const REACH := 8.0
 const WORLD_COLLISION_LAYER := 1
 const PLAYER_COLLISION_LAYER := 2
-const BLOCK_SLOTS := [VoxelWorld.GRASS, VoxelWorld.DIRT, VoxelWorld.STONE, VoxelWorld.PLANKS]
+const BLOCK_SLOTS := [VoxelWorld.GRASS, VoxelWorld.DIRT, VoxelWorld.STONE, VoxelWorld.PLANKS, VoxelWorld.BRICKS]
 
 var world: VoxelWorld
 var selected_block: int = VoxelWorld.GRASS
@@ -78,19 +78,19 @@ func _unhandled_input(event: InputEvent) -> void:
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 				return
 			if mouse_button.button_index == MOUSE_BUTTON_LEFT:
-				_break_target_block()
+				try_break_target_block()
 			elif mouse_button.button_index == MOUSE_BUTTON_RIGHT:
-				_place_next_to_target()
+				try_place_target_block()
 			elif mouse_button.button_index == MOUSE_BUTTON_WHEEL_UP:
-				_cycle_slot(-1)
+				cycle_slot(-1)
 			elif mouse_button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				_cycle_slot(1)
+				cycle_slot(1)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var key_event := event as InputEventKey
 		if key_event.keycode == KEY_ESCAPE:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		elif key_event.keycode >= KEY_1 and key_event.keycode <= KEY_4:
-			_select_slot(int(key_event.keycode - KEY_1))
+		elif key_event.keycode >= KEY_1 and key_event.keycode <= KEY_5:
+			select_slot(int(key_event.keycode - KEY_1))
 
 
 func apply_look_delta(relative: Vector2) -> void:
@@ -138,37 +138,52 @@ func update_target_block() -> void:
 	world.set_highlight(target_cell, has_target)
 
 
-func _break_target_block() -> void:
-	if has_target:
-		world.remove_block(target_cell)
-		update_target_block()
-
-
-func _place_next_to_target() -> void:
-	if not has_target:
-		return
-	var place_cell := target_cell + target_normal
-	if _cell_overlaps_player(place_cell):
-		return
-	world.place_block(place_cell, selected_block)
+func try_break_target_block() -> bool:
+	if not has_target or not world.has_block(target_cell):
+		return false
+	var removed := world.remove_block(target_cell)
 	update_target_block()
+	return removed
 
 
-func _cell_overlaps_player(cell: Vector3i) -> bool:
-	var center: Vector3 = world.to_global(world.map_to_local(cell))
-	var feet_y := global_position.y
-	var head_y := feet_y + BODY_HEIGHT
-	var horizontal_overlap := absf(center.x - global_position.x) < 0.86 and absf(center.z - global_position.z) < 0.86
-	var vertical_overlap := center.y + 0.5 > feet_y and center.y - 0.5 < head_y
-	return horizontal_overlap and vertical_overlap
+func try_place_target_block() -> bool:
+	if not has_target or not is_valid_face_normal(target_normal):
+		return false
+	var place_cell := target_cell + target_normal
+	if world.has_block(place_cell) or cell_overlaps_player(place_cell):
+		return false
+	var placed := world.place_block(place_cell, selected_block)
+	update_target_block()
+	return placed
 
 
-func _cycle_slot(step: int) -> void:
+func is_valid_face_normal(normal: Vector3i) -> bool:
+	return absi(normal.x) + absi(normal.y) + absi(normal.z) == 1
+
+
+func cell_overlaps_player(cell: Vector3i) -> bool:
+	var block_shape := BoxShape3D.new()
+	# 略微缩小查询盒，允许方块与玩家脚底或身体边界刚好接触。
+	block_shape.size = Vector3.ONE * (VoxelWorld.BLOCK_SIZE - 0.002)
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = block_shape
+	query.transform = Transform3D(Basis.IDENTITY, world.to_global(world.map_to_local(cell)))
+	query.collision_mask = PLAYER_COLLISION_LAYER
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	var intersections: Array[Dictionary] = get_world_3d().direct_space_state.intersect_shape(query, 1)
+	for intersection: Dictionary in intersections:
+		if intersection.get("collider") == self:
+			return true
+	return false
+
+
+func cycle_slot(step: int) -> void:
 	var current_index := BLOCK_SLOTS.find(selected_block)
-	_select_slot(posmod(current_index + step, BLOCK_SLOTS.size()))
+	select_slot(posmod(current_index + step, BLOCK_SLOTS.size()))
 
 
-func _select_slot(index: int) -> void:
+func select_slot(index: int) -> void:
 	if index < 0 or index >= BLOCK_SLOTS.size():
 		return
 	selected_block = BLOCK_SLOTS[index]

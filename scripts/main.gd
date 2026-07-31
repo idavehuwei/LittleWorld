@@ -63,6 +63,7 @@ func _register_inputs() -> void:
 	_bind_key(&"slot_2", KEY_2)
 	_bind_key(&"slot_3", KEY_3)
 	_bind_key(&"slot_4", KEY_4)
+	_bind_key(&"slot_5", KEY_5)
 
 
 func _bind_key(action: StringName, keycode: Key) -> void:
