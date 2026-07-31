@@ -77,7 +77,8 @@ func _update_fall_test() -> void:
 func _finish_fall_and_start_jump() -> void:
 	_expect(player.position.y < fall_start_y, "玩家受到重力后会下落")
 	_expect(landed, "玩家能够落到方块表面")
-	_expect(absf(player.position.y - 1.0) < 0.08, "落地时脚底位于方块顶面 y=1")
+	var expected_floor_y := float(world.get_surface_height(0, 0) + 1)
+	_expect(absf(player.position.y - expected_floor_y) < 0.08, "落地时脚底位于高度图对应地表顶面")
 	player.velocity.y = FirstPersonPlayer.JUMP_VELOCITY
 	jump_started = true
 	jump_peak_y = player.position.y
@@ -86,7 +87,8 @@ func _finish_fall_and_start_jump() -> void:
 func _update_jump_test() -> void:
 	if jump_started:
 		jump_peak_y = maxf(jump_peak_y, player.position.y)
-		if player.is_on_floor() and player.position.y < 1.08:
+		var expected_floor_y := float(world.get_surface_height(0, 0) + 1)
+		if player.is_on_floor() and player.position.y < expected_floor_y + 0.08:
 			jump_landed = true
 
 

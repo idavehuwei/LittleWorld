@@ -167,6 +167,38 @@ def crafting_table_texture() -> list[list[tuple[int, int, int, int]]]:
     return pixels
 
 
+def leaves_texture() -> list[list[tuple[int, int, int, int]]]:
+    pixels = noisy_texture((62, 137, 55), 901, 0.19)
+    rng = random.Random(902)
+    for _ in range(42):
+        x, y = rng.randrange(SIZE), rng.randrange(SIZE)
+        color = (37, 101, 42) if rng.random() < 0.55 else (101, 170, 68)
+        pixels[y][x] = shade(color, rng.uniform(0.88, 1.08))
+    return pixels
+
+
+def flower_texture() -> list[list[tuple[int, int, int, int]]]:
+    transparent = (0, 0, 0, 0)
+    pixels = [[transparent for _x in range(SIZE)] for _y in range(SIZE)]
+    stem = (48, 128, 47, 255)
+    leaf = (68, 151, 54, 255)
+    petal = (250, 224, 73, 255)
+    petal_light = (255, 247, 157, 255)
+    center = (154, 83, 34, 255)
+    for y in range(7, 16):
+        pixels[y][7] = stem
+        pixels[y][8] = stem
+    for x, y in [(5, 11), (6, 11), (9, 12), (10, 12), (6, 12), (9, 13)]:
+        pixels[y][x] = leaf
+    for x, y in [(7, 3), (8, 3), (5, 5), (6, 4), (9, 4), (10, 5), (6, 7), (9, 7), (7, 8), (8, 8)]:
+        pixels[y][x] = petal
+    for x, y in [(7, 4), (8, 4), (6, 5), (9, 5), (7, 7), (8, 7)]:
+        pixels[y][x] = petal_light
+    for x, y in [(7, 5), (8, 5), (7, 6), (8, 6)]:
+        pixels[y][x] = center
+    return pixels
+
+
 def write_wav(path: Path, samples: list[float]) -> None:
     pcm = bytearray()
     for sample in samples:
@@ -225,6 +257,8 @@ def main() -> None:
         "planks.png": planks_texture(),
         "bricks.png": bricks_texture(),
         "log.png": log_texture(),
+        "leaves.png": leaves_texture(),
+        "flower.png": flower_texture(),
         "crafting_table.png": crafting_table_texture(),
     }
     for filename, pixels in textures.items():

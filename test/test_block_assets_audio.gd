@@ -39,7 +39,7 @@ func _on_process_frame() -> void:
 
 
 func _test_texture_resources() -> void:
-	_expect(VoxelWorld.BLOCK_TEXTURE_PATHS.size() == 5, "五种方块均注册独立纹理")
+	_expect(VoxelWorld.BLOCK_TEXTURE_PATHS.size() == 8, "地形、建筑与自然装饰方块均注册独立纹理")
 	for block_id: int in VoxelWorld.BLOCK_TEXTURE_PATHS:
 		var texture_path: String = VoxelWorld.BLOCK_TEXTURE_PATHS[block_id] as String
 		var texture := load(texture_path) as Texture2D
@@ -49,8 +49,12 @@ func _test_texture_resources() -> void:
 
 	var library := world.mesh_library
 	for block_id: int in VoxelWorld.BLOCK_NAMES:
-		var mesh := library.get_item_mesh(block_id) as BoxMesh
-		var material := mesh.material as StandardMaterial3D
+		var mesh := library.get_item_mesh(block_id)
+		var material: StandardMaterial3D
+		if mesh is BoxMesh:
+			material = (mesh as BoxMesh).material as StandardMaterial3D
+		elif mesh is ArrayMesh:
+			material = (mesh as ArrayMesh).surface_get_material(0) as StandardMaterial3D
 		_expect(material != null and material.albedo_texture != null, "方块 %d 使用贴图材质" % block_id)
 		_expect(material.texture_filter == BaseMaterial3D.TEXTURE_FILTER_NEAREST, "方块 %d 使用最近邻过滤" % block_id)
 

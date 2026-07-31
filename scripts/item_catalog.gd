@@ -11,6 +11,8 @@ const ITEM_NAMES := {
 	VoxelWorld.STONE: "石头",
 	VoxelWorld.PLANKS: "木板",
 	VoxelWorld.BRICKS: "砖块",
+	VoxelWorld.LEAVES: "树叶",
+	VoxelWorld.FLOWER: "花朵",
 	LOG: "木头",
 	CRAFTING_TABLE: "工作台",
 }
@@ -21,6 +23,8 @@ const ITEM_ICON_PATHS := {
 	VoxelWorld.STONE: "res://assets/textures/blocks/stone.png",
 	VoxelWorld.PLANKS: "res://assets/textures/blocks/planks.png",
 	VoxelWorld.BRICKS: "res://assets/textures/blocks/bricks.png",
+	VoxelWorld.LEAVES: "res://assets/textures/blocks/leaves.png",
+	VoxelWorld.FLOWER: "res://assets/textures/blocks/flower.png",
 	LOG: "res://assets/textures/blocks/log.png",
 	CRAFTING_TABLE: "res://assets/textures/blocks/crafting_table.png",
 }

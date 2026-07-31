@@ -34,7 +34,7 @@ func _ready() -> void:
 	player.name = "Player"
 	player.world = world
 	player.inventory = inventory
-	player.position = Vector3(0.0, 2.0, 5.0)
+	player.position = world.spawn_world_position()
 	add_child(player)
 
 	var hud := GameHUD.new()

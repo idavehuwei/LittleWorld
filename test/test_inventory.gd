@@ -128,24 +128,28 @@ func _prepare_place_consumption() -> void:
 
 
 func _test_place_consumption() -> void:
+	var surface_y := world.get_surface_height(5, 5)
+	var place_cell := Vector3i(5, surface_y + 1, 5)
 	player.has_target = true
-	player.target_cell = Vector3i(5, 0, 5)
+	player.target_cell = Vector3i(5, surface_y, 5)
 	player.target_normal = Vector3i.UP
 	_expect(player.try_place_target_block(), "快捷栏有物品时可放置方块")
-	_expect(world.get_block(Vector3i(5, 1, 5)) == VoxelWorld.BRICKS, "放置类型来自快捷栏当前格")
+	_expect(world.get_block(place_cell) == VoxelWorld.BRICKS, "放置类型来自快捷栏当前格")
 	_expect(inventory.get_amount(0) == 1, "成功放置后消耗一个物品")
 
 
 func _test_empty_slot_rejection() -> void:
+	var surface_y := world.get_surface_height(6, 6)
+	var place_cell := Vector3i(6, surface_y + 1, 6)
 	inventory.set_slot(0, VoxelWorld.BRICKS, 1)
 	inventory.remove_from_slot(0, 1)
 	player.select_slot(0)
 	player.has_target = true
-	player.target_cell = Vector3i(6, 0, 6)
+	player.target_cell = Vector3i(6, surface_y, 6)
 	player.target_normal = Vector3i.UP
 	_expect(inventory.is_empty(0), "数量归零后快捷栏格自动清空")
 	_expect(not player.try_place_target_block(), "空快捷栏格无法继续放置")
-	_expect(world.get_block(Vector3i(6, 1, 6)) == VoxelWorld.AIR, "失败放置不修改世界")
+	_expect(world.get_block(place_cell) == VoxelWorld.AIR, "失败放置不修改世界")
 
 
 func _test_slot_swap() -> void:
