@@ -12,7 +12,7 @@ const AIR_ACCELERATION := 8.0
 const JUMP_VELOCITY := 7.0
 const MOUSE_SENSITIVITY := 0.0022
 const MAX_LOOK_ANGLE := deg_to_rad(89.0)
-const REACH := 7.0
+const REACH := 8.0
 const WORLD_COLLISION_LAYER := 1
 const PLAYER_COLLISION_LAYER := 2
 const BLOCK_SLOTS := [VoxelWorld.GRASS, VoxelWorld.DIRT, VoxelWorld.STONE, VoxelWorld.PLANKS]
@@ -42,7 +42,7 @@ func _physics_process(delta: float) -> void:
 	_try_jump()
 	_apply_horizontal_movement(delta)
 	move_and_slide()
-	_update_target_block()
+	update_target_block()
 
 
 func _apply_gravity(delta: float) -> void:
@@ -120,16 +120,20 @@ func _build_body() -> void:
 	head.add_child(camera)
 
 
-func _update_target_block() -> void:
-	var from := camera.global_position
-	var to := from + (-camera.global_transform.basis.z * REACH)
-	var query := PhysicsRayQueryParameters3D.create(from, to, 1, [self])
+func update_target_block() -> void:
+	var ray_origin := camera.global_position
+	var ray_direction := -camera.global_transform.basis.z.normalized()
+	var ray_end := ray_origin + ray_direction * REACH
+	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end, WORLD_COLLISION_LAYER, [self])
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
 	var result: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	has_target = not result.is_empty() and result.get("collider") == world
 	if has_target:
 		var hit_position: Vector3 = result["position"] as Vector3
 		var hit_normal: Vector3 = result["normal"] as Vector3
 		target_normal = Vector3i(roundi(hit_normal.x), roundi(hit_normal.y), roundi(hit_normal.z))
+		# 沿法线向命中方块内部偏移，避免落在两个网格单元的边界上。
 		target_cell = world.local_to_map(world.to_local(hit_position - hit_normal * 0.01))
 	world.set_highlight(target_cell, has_target)
 
@@ -137,7 +141,7 @@ func _update_target_block() -> void:
 func _break_target_block() -> void:
 	if has_target:
 		world.remove_block(target_cell)
-		_update_target_block()
+		update_target_block()
 
 
 func _place_next_to_target() -> void:
@@ -147,7 +151,7 @@ func _place_next_to_target() -> void:
 	if _cell_overlaps_player(place_cell):
 		return
 	world.place_block(place_cell, selected_block)
-	_update_target_block()
+	update_target_block()
 
 
 func _cell_overlaps_player(cell: Vector3i) -> bool:

@@ -3,6 +3,7 @@ extends CanvasLayer
 
 var title_label: Label
 var selected_label: Label
+var crosshair: Control
 var slot_panels: Array[PanelContainer] = []
 
 
@@ -57,17 +58,7 @@ func _build_ui() -> void:
 	help.size = Vector2(760, 32)
 	root.add_child(help)
 
-	var crosshair := Label.new()
-	crosshair.text = "+"
-	crosshair.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	crosshair.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	crosshair.add_theme_font_size_override("font_size", 28)
-	crosshair.add_theme_color_override("font_color", Color.WHITE)
-	crosshair.add_theme_color_override("font_shadow_color", Color.BLACK)
-	crosshair.set_anchors_preset(Control.PRESET_CENTER)
-	crosshair.position = Vector2(-18, -20)
-	crosshair.size = Vector2(36, 40)
-	root.add_child(crosshair)
+	_build_crosshair(root)
 
 	var hotbar := HBoxContainer.new()
 	hotbar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -102,3 +93,32 @@ func _build_ui() -> void:
 	selected_label.add_theme_color_override("font_shadow_color", Color.BLACK)
 	root.add_child(selected_label)
 	set_selected_block(VoxelWorld.GRASS)
+
+
+func _build_crosshair(root: Control) -> void:
+	crosshair = Control.new()
+	crosshair.name = "Crosshair"
+	crosshair.set_anchors_preset(Control.PRESET_CENTER)
+	crosshair.position = Vector2(-12.0, -12.0)
+	crosshair.size = Vector2(24.0, 24.0)
+	crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(crosshair)
+
+	# 使用 ColorRect 而不是字体字符，任何字体和分辨率下都保持像素稳定。
+	_add_crosshair_rect(Vector2(10.0, 1.0), Vector2(4.0, 8.0), Color(0.0, 0.0, 0.0, 0.72))
+	_add_crosshair_rect(Vector2(10.0, 15.0), Vector2(4.0, 8.0), Color(0.0, 0.0, 0.0, 0.72))
+	_add_crosshair_rect(Vector2(1.0, 10.0), Vector2(8.0, 4.0), Color(0.0, 0.0, 0.0, 0.72))
+	_add_crosshair_rect(Vector2(15.0, 10.0), Vector2(8.0, 4.0), Color(0.0, 0.0, 0.0, 0.72))
+	_add_crosshair_rect(Vector2(11.0, 2.0), Vector2(2.0, 7.0), Color.WHITE)
+	_add_crosshair_rect(Vector2(11.0, 15.0), Vector2(2.0, 7.0), Color.WHITE)
+	_add_crosshair_rect(Vector2(2.0, 11.0), Vector2(7.0, 2.0), Color.WHITE)
+	_add_crosshair_rect(Vector2(15.0, 11.0), Vector2(7.0, 2.0), Color.WHITE)
+
+
+func _add_crosshair_rect(rect_position: Vector2, rect_size: Vector2, color: Color) -> void:
+	var line := ColorRect.new()
+	line.position = rect_position
+	line.size = rect_size
+	line.color = color
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	crosshair.add_child(line)

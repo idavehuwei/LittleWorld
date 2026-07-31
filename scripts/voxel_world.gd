@@ -135,14 +135,42 @@ func _create_block_material(block_type: int) -> StandardMaterial3D:
 func _create_highlight() -> void:
 	highlight = MeshInstance3D.new()
 	highlight.name = "BlockHighlight"
-	var cube := BoxMesh.new()
-	cube.size = Vector3.ONE * 1.012
+	highlight.mesh = _create_wireframe_cube_mesh()
+	highlight.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	highlight.visible = false
+	add_child(highlight)
+
+
+func _create_wireframe_cube_mesh() -> ArrayMesh:
+	var half_size := BLOCK_SIZE * 0.506
+	var corners := PackedVector3Array([
+		Vector3(-half_size, -half_size, -half_size),
+		Vector3(half_size, -half_size, -half_size),
+		Vector3(half_size, half_size, -half_size),
+		Vector3(-half_size, half_size, -half_size),
+		Vector3(-half_size, -half_size, half_size),
+		Vector3(half_size, -half_size, half_size),
+		Vector3(half_size, half_size, half_size),
+		Vector3(-half_size, half_size, half_size),
+	])
+	var edge_indices := PackedInt32Array([
+		0, 1, 1, 2, 2, 3, 3, 0,
+		4, 5, 5, 6, 6, 7, 7, 4,
+		0, 4, 1, 5, 2, 6, 3, 7,
+	])
+	var line_vertices := PackedVector3Array()
+	for index: int in edge_indices:
+		line_vertices.append(corners[index])
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = line_vertices
+	var line_mesh := ArrayMesh.new()
+	line_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 	var material := StandardMaterial3D.new()
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color(1.0, 0.94, 0.35, 0.20)
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	cube.material = material
-	highlight.mesh = cube
-	highlight.visible = false
-	add_child(highlight)
+	material.albedo_color = Color(1.0, 0.86, 0.24, 0.88)
+	material.no_depth_test = true
+	line_mesh.surface_set_material(0, material)
+	return line_mesh
