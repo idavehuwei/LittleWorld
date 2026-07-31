@@ -2,12 +2,16 @@ extends Node3D
 
 var world: VoxelWorld
 var player: FirstPersonPlayer
+var day_night_cycle: DayNightCycle
 
 
 func _ready() -> void:
 	_setup_font()
 	_register_inputs()
-	_build_environment()
+
+	day_night_cycle = DayNightCycle.new()
+	day_night_cycle.name = "DayNightCycle"
+	add_child(day_night_cycle)
 
 	world = VoxelWorld.new()
 	world.name = "VoxelWorld"
@@ -31,26 +35,6 @@ func _setup_font() -> void:
 	var system_font := SystemFont.new()
 	system_font.font_names = PackedStringArray(["PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC"])
 	ThemeDB.fallback_font = system_font
-
-
-func _build_environment() -> void:
-	var environment := WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("8ed5f7")
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("d8ecff")
-	env.ambient_light_energy = 0.72
-	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	environment.environment = env
-	add_child(environment)
-
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-52.0, -34.0, 0.0)
-	sun.light_color = Color("fff3cf")
-	sun.light_energy = 1.15
-	sun.shadow_enabled = true
-	add_child(sun)
 
 
 func _register_inputs() -> void:
