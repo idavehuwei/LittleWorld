@@ -28,6 +28,8 @@ var crafting_output_count: Label
 var preview_button: Button
 var craft_button: Button
 var crafting_status: Label
+var recipe_candidates: VBoxContainer
+var recipe_candidate_buttons: Array[Button] = []
 var held_slot_index := -1
 
 
@@ -38,6 +40,7 @@ func _ready() -> void:
 	inventory.slot_changed.connect(_on_slot_changed)
 	inventory.selection_changed.connect(_on_selection_changed)
 	crafting_grid.grid_changed.connect(_refresh_crafting_slots)
+	crafting_grid.preview_changed.connect(_on_preview_candidates_changed)
 	crafting_grid.output_changed.connect(_on_crafting_output_changed)
 	refresh_all_slots()
 	_refresh_crafting_slots()
@@ -220,7 +223,7 @@ func _build_crafting_ui(content: VBoxContainer) -> void:
 	recipe_heading.add_theme_font_size_override("font_size", 24)
 	left_column.add_child(recipe_heading)
 	var recipe_hint := Label.new()
-	recipe_hint.text = "已知配方\n• 1 木头 → 4 木板\n• 2×2 木板 → 1 工作台"
+	recipe_hint.text = "按材料总量匹配，可多放材料\n• 1 木头 → 4 木板\n• 4 木板 → 工作台 / 砖块"
 	recipe_hint.add_theme_font_size_override("font_size", 18)
 	recipe_hint.add_theme_color_override("font_color", Color(0.94, 0.88, 0.72))
 	left_column.add_child(recipe_hint)
@@ -271,6 +274,9 @@ func _build_crafting_ui(content: VBoxContainer) -> void:
 	crafting_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	crafting_status.add_theme_font_size_override("font_size", 16)
 	action_column.add_child(crafting_status)
+	recipe_candidates = VBoxContainer.new()
+	recipe_candidates.add_theme_constant_override("separation", 6)
+	action_column.add_child(recipe_candidates)
 
 	var output_column := VBoxContainer.new()
 	output_column.add_theme_constant_override("separation", 8)
@@ -428,15 +434,27 @@ func _on_crafting_slot_pressed(index: int) -> void:
 
 
 func _on_preview_pressed() -> void:
-	if crafting_grid.preview_recipe():
-		crafting_status.text = "已找到配方，可以合成"
-		inventory_title.text = "配方预览：%s ×%d" % [
+	if crafting_grid.total_material_count() <= 0:
+		crafting_status.text = "请放入2×2材料"
+		inventory_title.text = "请先从背包选择材料，再放入2×2合成格"
+		return
+	var recipes := crafting_grid.preview_all_recipes()
+	if recipes.is_empty():
+		crafting_status.text = "当前材料不足以制作任何物品"
+		inventory_title.text = "预览失败：可以多放材料，系统按总数量判断"
+	else:
+		crafting_status.text = "可制作 %d 种，请点击选择" % recipes.size()
+		inventory_title.text = "预览完成：点击一个成品候选，再点击合成"
+
+
+func _on_recipe_candidate_pressed(index: int) -> void:
+	if crafting_grid.select_preview(index):
+		crafting_status.text = "已选择：%s ×%d" % [
 			ItemCatalog.display_name(crafting_grid.output_item()),
 			crafting_grid.output_amount(),
 		]
-	else:
-		crafting_status.text = "没有匹配的配方"
-		inventory_title.text = "预览失败：请调整2×2材料"
+		inventory_title.text = "已选择目标配方，点击“合成”制作该物品"
+		_refresh_recipe_candidate_styles(index)
 
 
 func _on_crafting_output_pressed() -> void:
@@ -460,6 +478,37 @@ func _refresh_crafting_slots() -> void:
 		crafting_counts[index].text = str(crafting_grid.get_amount(index)) if crafting_grid.get_amount(index) > 0 else ""
 	_on_crafting_output_changed(crafting_grid.output_item(), crafting_grid.output_amount())
 	crafting_status.text = "材料已变化，点击“预览配方”"
+
+
+func _on_preview_candidates_changed(recipes: Array[CraftingRecipe]) -> void:
+	for child: Node in recipe_candidates.get_children():
+		child.queue_free()
+	recipe_candidate_buttons.clear()
+	for index: int in range(recipes.size()):
+		var recipe := recipes[index]
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(170, 42)
+		button.text = "%s ×%d" % [ItemCatalog.display_name(recipe.result_item), recipe.result_amount]
+		button.tooltip_text = _recipe_material_text(recipe)
+		button.add_theme_font_size_override("font_size", 17)
+		button.pressed.connect(_on_recipe_candidate_pressed.bind(index))
+		recipe_candidates.add_child(button)
+		recipe_candidate_buttons.append(button)
+	if recipes.is_empty():
+		craft_button.disabled = true
+
+
+func _refresh_recipe_candidate_styles(selected_index: int) -> void:
+	for index: int in range(recipe_candidate_buttons.size()):
+		var button := recipe_candidate_buttons[index]
+		button.modulate = Color("ffd75c") if index == selected_index else Color.WHITE
+
+
+func _recipe_material_text(recipe: CraftingRecipe) -> String:
+	var parts: PackedStringArray = []
+	for item_id: int in recipe.required_items:
+		parts.append("%s ×%d" % [ItemCatalog.display_name(item_id), recipe.required_items[item_id]])
+	return "需要：" + "、".join(parts)
 
 
 func _on_crafting_output_changed(item_id: int, amount: int) -> void:
