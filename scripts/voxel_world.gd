@@ -11,6 +11,7 @@ const WORLD_WIDTH := 250
 const WORLD_DEPTH := 250
 const BLOCK_SIZE := 1.0
 const GROUND_CELL_Y := 0
+const WORLD_COLLISION_LAYER := 1
 
 const BLOCK_NAMES := {
 	GRASS: "草方块",
@@ -34,8 +35,8 @@ func _ready() -> void:
 	# GridMap 默认开启 cell_center_y，cell y=0 的中心会自动位于 y=0.5，
 	# 因此 1 米方块无需移动就严格占据世界空间 y=0 到 y=1。
 	mesh_library = _create_block_library()
-	collision_layer = 1
-	collision_mask = 1
+	collision_layer = WORLD_COLLISION_LAYER
+	collision_mask = 0
 	_create_highlight()
 
 

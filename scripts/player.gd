@@ -3,15 +3,25 @@ extends CharacterBody3D
 
 signal selection_changed(block_type: int)
 
+const BODY_HEIGHT := 1.80
+const BODY_RADIUS := 0.35
+const EYE_HEIGHT := 1.62
 const WALK_SPEED := 6.0
+const GROUND_ACCELERATION := 28.0
+const AIR_ACCELERATION := 8.0
 const JUMP_VELOCITY := 7.0
 const MOUSE_SENSITIVITY := 0.0022
+const MAX_LOOK_ANGLE := deg_to_rad(89.0)
 const REACH := 7.0
+const WORLD_COLLISION_LAYER := 1
+const PLAYER_COLLISION_LAYER := 2
 const BLOCK_SLOTS := [VoxelWorld.GRASS, VoxelWorld.DIRT, VoxelWorld.STONE, VoxelWorld.PLANKS]
 
 var world: VoxelWorld
 var selected_block: int = VoxelWorld.GRASS
+var head: Node3D
 var camera: Camera3D
+var body_collision: CollisionShape3D
 var gravity: float = 18.0
 var target_cell := Vector3i.ZERO
 var target_normal := Vector3i.ZERO
@@ -19,33 +29,48 @@ var has_target := false
 
 
 func _ready() -> void:
+	collision_layer = PLAYER_COLLISION_LAYER
+	collision_mask = WORLD_COLLISION_LAYER
+	floor_stop_on_slope = true
+	floor_snap_length = 0.12
 	_build_body()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _physics_process(delta: float) -> void:
-	if not is_on_floor():
+	_apply_gravity(delta)
+	_try_jump()
+	_apply_horizontal_movement(delta)
+	move_and_slide()
+	_update_target_block()
+
+
+func _apply_gravity(delta: float) -> void:
+	if is_on_floor():
+		if velocity.y < 0.0:
+			velocity.y = 0.0
+	else:
 		velocity.y -= gravity * delta
+
+
+func _try_jump() -> void:
 	if Input.is_action_just_pressed(&"jump") and is_on_floor():
 		velocity.y = JUMP_VELOCITY
 
+
+func _apply_horizontal_movement(delta: float) -> void:
 	var input_vector := Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
 	var direction := (transform.basis * Vector3(input_vector.x, 0.0, input_vector.y)).normalized()
-	if direction != Vector3.ZERO:
-		velocity.x = direction.x * WALK_SPEED
-		velocity.z = direction.z * WALK_SPEED
-	else:
-		velocity.x = move_toward(velocity.x, 0.0, WALK_SPEED * 8.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, WALK_SPEED * 8.0 * delta)
-	move_and_slide()
-	_update_target_block()
+	var target_velocity := direction * WALK_SPEED
+	var acceleration := GROUND_ACCELERATION if is_on_floor() else AIR_ACCELERATION
+	velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
+	velocity.z = move_toward(velocity.z, target_velocity.z, acceleration * delta)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var motion := event as InputEventMouseMotion
-		rotate_y(-motion.relative.x * MOUSE_SENSITIVITY)
-		camera.rotation.x = clampf(camera.rotation.x - motion.relative.y * MOUSE_SENSITIVITY, -1.50, 1.50)
+		apply_look_delta(motion.relative)
 	elif event is InputEventMouseButton:
 		var mouse_button := event as InputEventMouseButton
 		if mouse_button.pressed:
@@ -68,20 +93,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_slot(int(key_event.keycode - KEY_1))
 
 
+func apply_look_delta(relative: Vector2) -> void:
+	rotate_y(-relative.x * MOUSE_SENSITIVITY)
+	head.rotation.x = clampf(head.rotation.x - relative.y * MOUSE_SENSITIVITY, -MAX_LOOK_ANGLE, MAX_LOOK_ANGLE)
+
+
 func _build_body() -> void:
-	var collision := CollisionShape3D.new()
+	body_collision = CollisionShape3D.new()
+	body_collision.name = "BodyCollision"
 	var capsule := CapsuleShape3D.new()
-	capsule.radius = 0.35
-	capsule.height = 1.80
-	collision.shape = capsule
-	collision.position.y = 0.90
-	add_child(collision)
+	capsule.radius = BODY_RADIUS
+	capsule.height = BODY_HEIGHT
+	body_collision.shape = capsule
+	# CharacterBody3D 的原点约定在脚底，胶囊中心上移半个身高。
+	body_collision.position.y = BODY_HEIGHT * 0.5
+	add_child(body_collision)
+
+	head = Node3D.new()
+	head.name = "Head"
+	head.position.y = EYE_HEIGHT
+	add_child(head)
 
 	camera = Camera3D.new()
 	camera.name = "Camera3D"
-	camera.position.y = 1.62
 	camera.current = true
-	add_child(camera)
+	head.add_child(camera)
 
 
 func _update_target_block() -> void:
@@ -117,7 +153,7 @@ func _place_next_to_target() -> void:
 func _cell_overlaps_player(cell: Vector3i) -> bool:
 	var center: Vector3 = world.to_global(world.map_to_local(cell))
 	var feet_y := global_position.y
-	var head_y := feet_y + 1.80
+	var head_y := feet_y + BODY_HEIGHT
 	var horizontal_overlap := absf(center.x - global_position.x) < 0.86 and absf(center.z - global_position.z) < 0.86
 	var vertical_overlap := center.y + 0.5 > feet_y and center.y - 0.5 < head_y
 	return horizontal_overlap and vertical_overlap
