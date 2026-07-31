@@ -5,6 +5,7 @@ var player: FirstPersonPlayer
 var day_night_cycle: DayNightCycle
 var block_audio_manager: BlockAudioManager
 var inventory: PlayerInventory
+var crafting_grid: CraftingGrid
 
 
 func _ready() -> void:
@@ -27,6 +28,7 @@ func _ready() -> void:
 
 	inventory = PlayerInventory.new()
 	inventory.seed_demo_items()
+	crafting_grid = CraftingGrid.new(inventory)
 
 	player = FirstPersonPlayer.new()
 	player.name = "Player"
@@ -38,6 +40,7 @@ func _ready() -> void:
 	var hud := GameHUD.new()
 	hud.name = "HUD"
 	hud.inventory = inventory
+	hud.crafting_grid = crafting_grid
 	add_child(hud)
 	player.selection_changed.connect(hud.set_selected_block)
 	player.inventory_visibility_changed.connect(hud.set_inventory_open)

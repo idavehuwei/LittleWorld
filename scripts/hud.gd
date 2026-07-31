@@ -5,6 +5,7 @@ const SLOT_SIZE := Vector2(56.0, 56.0)
 const HOTBAR_GAP := 6
 
 var inventory: PlayerInventory
+var crafting_grid: CraftingGrid
 var title_label: Label
 var selected_label: Label
 var crosshair: Control
@@ -17,15 +18,25 @@ var hotbar_counts: Array[Label] = []
 var inventory_buttons: Array[Button] = []
 var inventory_icons: Array[TextureRect] = []
 var inventory_counts: Array[Label] = []
+var crafting_buttons: Array[Button] = []
+var crafting_icons: Array[TextureRect] = []
+var crafting_counts: Array[Label] = []
+var crafting_output_button: Button
+var crafting_output_icon: TextureRect
+var crafting_output_count: Label
 var held_slot_index := -1
 
 
 func _ready() -> void:
 	assert(inventory != null, "GameHUD 需要在进入场景树前设置 inventory")
+	assert(crafting_grid != null, "GameHUD 需要在进入场景树前设置 crafting_grid")
 	_build_ui()
 	inventory.slot_changed.connect(_on_slot_changed)
 	inventory.selection_changed.connect(_on_selection_changed)
+	crafting_grid.grid_changed.connect(_refresh_crafting_slots)
+	crafting_grid.output_changed.connect(_on_crafting_output_changed)
 	refresh_all_slots()
+	_refresh_crafting_slots()
 
 
 func set_selected_block(block_type: int) -> void:
@@ -45,7 +56,7 @@ func set_inventory_open(is_open: bool) -> void:
 	inventory_panel.visible = is_open
 	crosshair.visible = not is_open
 	held_slot_index = -1
-	inventory_title.text = "背包  ·  36 格  ·  点击两个格子可交换" if is_open else "背包"
+	inventory_title.text = "背包  ·  36 格  ·  点击物品后点击合成格放入材料" if is_open else "背包"
 	_refresh_selection_styles()
 
 
@@ -129,8 +140,8 @@ func _build_inventory_panel(root: Control) -> void:
 	inventory_panel = PanelContainer.new()
 	inventory_panel.name = "InventoryPanel"
 	inventory_panel.set_anchors_preset(Control.PRESET_CENTER)
-	inventory_panel.position = Vector2(-310, -180)
-	inventory_panel.custom_minimum_size = Vector2(620, 360)
+	inventory_panel.position = Vector2(-360, -260)
+	inventory_panel.custom_minimum_size = Vector2(720, 520)
 	inventory_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.055, 0.065, 0.08, 0.97)
@@ -152,6 +163,14 @@ func _build_inventory_panel(root: Control) -> void:
 	inventory_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	inventory_title.add_theme_font_size_override("font_size", 24)
 	content.add_child(inventory_title)
+	_build_crafting_ui(content)
+
+	var separator := HSeparator.new()
+	content.add_child(separator)
+	var storage_label := Label.new()
+	storage_label.text = "物品栏"
+	storage_label.add_theme_font_size_override("font_size", 17)
+	content.add_child(storage_label)
 
 	var grid := GridContainer.new()
 	grid.columns = PlayerInventory.HOTBAR_SIZE
@@ -167,6 +186,72 @@ func _build_inventory_panel(root: Control) -> void:
 		inventory_icons.append(slot["icon"] as TextureRect)
 		inventory_counts.append(slot["count"] as Label)
 	inventory_panel.visible = false
+
+
+func _build_crafting_ui(content: VBoxContainer) -> void:
+	var crafting_row := HBoxContainer.new()
+	crafting_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	crafting_row.add_theme_constant_override("separation", 20)
+	content.add_child(crafting_row)
+
+	var recipe_hint := Label.new()
+	recipe_hint.text = "简单合成\n木头 → 4 木板\n4 木板 → 工作台"
+	recipe_hint.custom_minimum_size = Vector2(165, 100)
+	recipe_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	recipe_hint.add_theme_color_override("font_color", Color(0.88, 0.86, 0.78))
+	crafting_row.add_child(recipe_hint)
+
+	var input_grid := GridContainer.new()
+	input_grid.columns = 2
+	input_grid.add_theme_constant_override("h_separation", HOTBAR_GAP)
+	input_grid.add_theme_constant_override("v_separation", HOTBAR_GAP)
+	crafting_row.add_child(input_grid)
+	for index: int in range(CraftingGrid.GRID_SIZE):
+		var slot := _create_crafting_button(index)
+		input_grid.add_child(slot["button"] as Button)
+		crafting_buttons.append(slot["button"] as Button)
+		crafting_icons.append(slot["icon"] as TextureRect)
+		crafting_counts.append(slot["count"] as Label)
+
+	var arrow := Label.new()
+	arrow.text = "→"
+	arrow.add_theme_font_size_override("font_size", 30)
+	crafting_row.add_child(arrow)
+
+	var output_slot := _create_crafting_button(-1)
+	crafting_output_button = output_slot["button"] as Button
+	crafting_output_button.name = "CraftingOutput"
+	crafting_output_button.pressed.connect(_on_crafting_output_pressed)
+	crafting_output_icon = output_slot["icon"] as TextureRect
+	crafting_output_count = output_slot["count"] as Label
+	crafting_row.add_child(crafting_output_button)
+
+
+func _create_crafting_button(index: int) -> Dictionary:
+	var button := Button.new()
+	button.name = "CraftingInput%d" % index
+	button.custom_minimum_size = SLOT_SIZE
+	button.focus_mode = Control.FOCUS_NONE
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	button.pressed.connect(_on_crafting_slot_pressed.bind(index))
+	var icon := TextureRect.new()
+	icon.position = Vector2(9, 8)
+	icon.size = Vector2(38, 38)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(icon)
+	var count := Label.new()
+	count.position = Vector2(4, 31)
+	count.size = Vector2(47, 21)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	count.add_theme_font_size_override("font_size", 15)
+	count.add_theme_color_override("font_shadow_color", Color.BLACK)
+	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(count)
+	_apply_button_style(button, false, false)
+	return {"button": button, "icon": icon, "count": count}
 
 
 func _create_slot_button(index: int, is_hotbar: bool) -> Dictionary:
@@ -262,8 +347,48 @@ func _on_slot_pressed(index: int) -> void:
 		return
 	inventory.swap_slots(held_slot_index, index)
 	held_slot_index = -1
-	inventory_title.text = "背包  ·  36 格  ·  点击两个格子可交换"
+	inventory_title.text = "背包  ·  36 格  ·  点击物品后再点击合成格可放入材料"
 	_refresh_selection_styles()
+
+
+func _on_crafting_slot_pressed(index: int) -> void:
+	if index < 0:
+		return
+	if held_slot_index >= 0:
+		if crafting_grid.move_one_from_inventory(held_slot_index, index):
+			inventory_title.text = "已放入1个材料  ·  可继续点击合成格"
+			if inventory.is_empty(held_slot_index):
+				held_slot_index = -1
+	else:
+		crafting_grid.return_one_to_inventory(index)
+		inventory_title.text = "已从合成格取回1个材料"
+	_refresh_selection_styles()
+
+
+func _on_crafting_output_pressed() -> void:
+	var result_item := crafting_grid.output_item()
+	var result_amount := crafting_grid.output_amount()
+	if crafting_grid.craft_once():
+		inventory_title.text = "合成成功：%s ×%d" % [
+			ItemCatalog.display_name(result_item),
+			result_amount,
+		]
+	else:
+		inventory_title.text = "无法合成：请检查配方或背包空间"
+
+
+func _refresh_crafting_slots() -> void:
+	for index: int in range(CraftingGrid.GRID_SIZE):
+		var item_id := crafting_grid.get_item(index)
+		crafting_icons[index].texture = load(ItemCatalog.icon_path(item_id)) as Texture2D if item_id != PlayerInventory.EMPTY_ITEM else null
+		crafting_counts[index].text = str(crafting_grid.get_amount(index)) if crafting_grid.get_amount(index) > 0 else ""
+	_on_crafting_output_changed(crafting_grid.output_item(), crafting_grid.output_amount())
+
+
+func _on_crafting_output_changed(item_id: int, amount: int) -> void:
+	crafting_output_icon.texture = load(ItemCatalog.icon_path(item_id)) as Texture2D if item_id != PlayerInventory.EMPTY_ITEM else null
+	crafting_output_count.text = str(amount) if amount > 0 else ""
+	crafting_output_button.disabled = item_id == PlayerInventory.EMPTY_ITEM
 
 
 func _refresh_slot(index: int) -> void:
