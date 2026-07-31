@@ -32,6 +32,14 @@ const BLOCK_COLORS := {
 	BRICKS: Color("b5523b"),
 }
 
+const BLOCK_TEXTURE_PATHS := {
+	GRASS: "res://assets/textures/blocks/grass.png",
+	DIRT: "res://assets/textures/blocks/dirt.png",
+	STONE: "res://assets/textures/blocks/stone.png",
+	PLANKS: "res://assets/textures/blocks/planks.png",
+	BRICKS: "res://assets/textures/blocks/bricks.png",
+}
+
 var highlight: MeshInstance3D
 
 
@@ -119,30 +127,9 @@ func _create_block_library() -> MeshLibrary:
 
 
 func _create_block_material(block_type: int) -> StandardMaterial3D:
-	var base_color: Color = BLOCK_COLORS[block_type] as Color
-	var image := Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	for y: int in range(16):
-		for x: int in range(16):
-			var checker: float = 0.90 if ((x / 4 + y / 4) as int) % 2 == 0 else 1.08
-			var noise: float = 0.96 + float((x * 13 + y * 7 + block_type * 11) % 9) / 100.0
-			var color := Color(
-				clampf(base_color.r * checker * noise, 0.0, 1.0),
-				clampf(base_color.g * checker * noise, 0.0, 1.0),
-				clampf(base_color.b * checker * noise, 0.0, 1.0),
-				1.0
-			)
-			if block_type == PLANKS and y % 5 == 0:
-				color = color.darkened(0.20)
-			if block_type == BRICKS:
-				var mortar_row := y % 6 == 0
-				var row_offset := 4 if (y / 6 as int) % 2 == 1 else 0
-				var mortar_column := (x + row_offset) % 8 == 0
-				if mortar_row or mortar_column:
-					color = Color("d3b09b")
-			if block_type == GRASS and y > 11:
-				color = color.darkened(0.10)
-			image.set_pixel(x, y, color)
-	var texture := ImageTexture.create_from_image(image)
+	var texture_path: String = BLOCK_TEXTURE_PATHS[block_type] as String
+	var texture := load(texture_path) as Texture2D
+	assert(texture != null, "无法加载方块纹理: %s" % texture_path)
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = texture
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST

@@ -3,6 +3,7 @@ extends Node3D
 var world: VoxelWorld
 var player: FirstPersonPlayer
 var day_night_cycle: DayNightCycle
+var block_audio_manager: BlockAudioManager
 
 
 func _ready() -> void:
@@ -17,6 +18,11 @@ func _ready() -> void:
 	world.name = "VoxelWorld"
 	add_child(world)
 	world.build_initial_world()
+
+	block_audio_manager = BlockAudioManager.new()
+	block_audio_manager.name = "BlockAudioManager"
+	block_audio_manager.world = world
+	add_child(block_audio_manager)
 
 	player = FirstPersonPlayer.new()
 	player.name = "Player"
