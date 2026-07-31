@@ -1,0 +1,12 @@
+# Godot generated files
+.godot/
+
+# WorkBuddy project metadata
+.workbuddy/
+
+# macOS
+.DS_Store
+
+# Generated delivery artifacts
+outputs/
+*.zip
