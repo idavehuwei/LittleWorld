@@ -1,8 +1,9 @@
 class_name GameHUD
 extends CanvasLayer
 
-const SLOT_SIZE := Vector2(56.0, 56.0)
-const HOTBAR_GAP := 6
+const SLOT_SIZE := Vector2(68.0, 68.0)
+const CRAFT_SLOT_SIZE := Vector2(82.0, 82.0)
+const HOTBAR_GAP := 8
 
 var inventory: PlayerInventory
 var crafting_grid: CraftingGrid
@@ -24,6 +25,9 @@ var crafting_counts: Array[Label] = []
 var crafting_output_button: Button
 var crafting_output_icon: TextureRect
 var crafting_output_count: Label
+var preview_button: Button
+var craft_button: Button
+var crafting_status: Label
 var held_slot_index := -1
 
 
@@ -80,10 +84,10 @@ func _build_ui() -> void:
 
 	selected_label = Label.new()
 	selected_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	selected_label.position = Vector2(-150, -116)
-	selected_label.size = Vector2(300, 28)
+	selected_label.position = Vector2(-190, -134)
+	selected_label.size = Vector2(380, 32)
 	selected_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	selected_label.add_theme_font_size_override("font_size", 17)
+	selected_label.add_theme_font_size_override("font_size", 20)
 	selected_label.add_theme_color_override("font_shadow_color", Color.BLACK)
 	root.add_child(selected_label)
 
@@ -123,7 +127,7 @@ func _build_hotbar(root: Control) -> void:
 	hotbar.name = "Hotbar"
 	hotbar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	var width := PlayerInventory.HOTBAR_SIZE * int(SLOT_SIZE.x) + (PlayerInventory.HOTBAR_SIZE - 1) * HOTBAR_GAP
-	hotbar.position = Vector2(-width * 0.5, -82)
+	hotbar.position = Vector2(-width * 0.5, -98)
 	hotbar.add_theme_constant_override("separation", HOTBAR_GAP)
 	root.add_child(hotbar)
 
@@ -140,28 +144,28 @@ func _build_inventory_panel(root: Control) -> void:
 	inventory_panel = PanelContainer.new()
 	inventory_panel.name = "InventoryPanel"
 	inventory_panel.set_anchors_preset(Control.PRESET_CENTER)
-	inventory_panel.position = Vector2(-360, -260)
-	inventory_panel.custom_minimum_size = Vector2(720, 520)
+	inventory_panel.position = Vector2(-510, -390)
+	inventory_panel.custom_minimum_size = Vector2(1020, 780)
 	inventory_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.055, 0.065, 0.08, 0.97)
-	panel_style.border_color = Color(0.92, 0.86, 0.68, 0.72)
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(14)
-	panel_style.content_margin_left = 28
-	panel_style.content_margin_right = 28
-	panel_style.content_margin_top = 22
-	panel_style.content_margin_bottom = 24
+	panel_style.bg_color = Color(0.12, 0.105, 0.085, 0.985)
+	panel_style.border_color = Color(0.74, 0.62, 0.42, 0.98)
+	panel_style.set_border_width_all(4)
+	panel_style.set_corner_radius_all(10)
+	panel_style.content_margin_left = 42
+	panel_style.content_margin_right = 42
+	panel_style.content_margin_top = 30
+	panel_style.content_margin_bottom = 32
 	inventory_panel.add_theme_stylebox_override("panel", panel_style)
 	root.add_child(inventory_panel)
 
 	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 14)
+	content.add_theme_constant_override("separation", 20)
 	inventory_panel.add_child(content)
 	inventory_title = Label.new()
 	inventory_title.text = "背包  ·  36 格"
 	inventory_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	inventory_title.add_theme_font_size_override("font_size", 24)
+	inventory_title.add_theme_font_size_override("font_size", 30)
 	content.add_child(inventory_title)
 	_build_crafting_ui(content)
 
@@ -169,7 +173,7 @@ func _build_inventory_panel(root: Control) -> void:
 	content.add_child(separator)
 	var storage_label := Label.new()
 	storage_label.text = "物品栏"
-	storage_label.add_theme_font_size_override("font_size", 17)
+	storage_label.add_theme_font_size_override("font_size", 21)
 	content.add_child(storage_label)
 
 	var grid := GridContainer.new()
@@ -189,23 +193,51 @@ func _build_inventory_panel(root: Control) -> void:
 
 
 func _build_crafting_ui(content: VBoxContainer) -> void:
+	var workbench := PanelContainer.new()
+	var workbench_style := StyleBoxFlat.new()
+	workbench_style.bg_color = Color(0.22, 0.18, 0.12, 0.96)
+	workbench_style.border_color = Color(0.48, 0.36, 0.21, 1.0)
+	workbench_style.set_border_width_all(3)
+	workbench_style.set_corner_radius_all(8)
+	workbench_style.content_margin_left = 24
+	workbench_style.content_margin_right = 24
+	workbench_style.content_margin_top = 20
+	workbench_style.content_margin_bottom = 20
+	workbench.add_theme_stylebox_override("panel", workbench_style)
+	content.add_child(workbench)
+
 	var crafting_row := HBoxContainer.new()
 	crafting_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	crafting_row.add_theme_constant_override("separation", 20)
-	content.add_child(crafting_row)
+	crafting_row.add_theme_constant_override("separation", 28)
+	workbench.add_child(crafting_row)
 
+	var left_column := VBoxContainer.new()
+	left_column.custom_minimum_size = Vector2(220, 190)
+	left_column.add_theme_constant_override("separation", 10)
+	crafting_row.add_child(left_column)
+	var recipe_heading := Label.new()
+	recipe_heading.text = "简易工作台"
+	recipe_heading.add_theme_font_size_override("font_size", 24)
+	left_column.add_child(recipe_heading)
 	var recipe_hint := Label.new()
-	recipe_hint.text = "简单合成\n木头 → 4 木板\n4 木板 → 工作台"
-	recipe_hint.custom_minimum_size = Vector2(165, 100)
-	recipe_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	recipe_hint.add_theme_color_override("font_color", Color(0.88, 0.86, 0.78))
-	crafting_row.add_child(recipe_hint)
+	recipe_hint.text = "已知配方\n• 1 木头 → 4 木板\n• 2×2 木板 → 1 工作台"
+	recipe_hint.add_theme_font_size_override("font_size", 18)
+	recipe_hint.add_theme_color_override("font_color", Color(0.94, 0.88, 0.72))
+	left_column.add_child(recipe_hint)
 
+	var input_column := VBoxContainer.new()
+	input_column.add_theme_constant_override("separation", 8)
+	crafting_row.add_child(input_column)
+	var input_label := Label.new()
+	input_label.text = "合成材料"
+	input_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	input_label.add_theme_font_size_override("font_size", 20)
+	input_column.add_child(input_label)
 	var input_grid := GridContainer.new()
 	input_grid.columns = 2
-	input_grid.add_theme_constant_override("h_separation", HOTBAR_GAP)
-	input_grid.add_theme_constant_override("v_separation", HOTBAR_GAP)
-	crafting_row.add_child(input_grid)
+	input_grid.add_theme_constant_override("h_separation", 10)
+	input_grid.add_theme_constant_override("v_separation", 10)
+	input_column.add_child(input_grid)
 	for index: int in range(CraftingGrid.GRID_SIZE):
 		var slot := _create_crafting_button(index)
 		input_grid.add_child(slot["button"] as Button)
@@ -213,40 +245,70 @@ func _build_crafting_ui(content: VBoxContainer) -> void:
 		crafting_icons.append(slot["icon"] as TextureRect)
 		crafting_counts.append(slot["count"] as Label)
 
-	var arrow := Label.new()
-	arrow.text = "→"
-	arrow.add_theme_font_size_override("font_size", 30)
-	crafting_row.add_child(arrow)
+	var action_column := VBoxContainer.new()
+	action_column.custom_minimum_size = Vector2(170, 190)
+	action_column.alignment = BoxContainer.ALIGNMENT_CENTER
+	action_column.add_theme_constant_override("separation", 12)
+	crafting_row.add_child(action_column)
+	preview_button = Button.new()
+	preview_button.name = "PreviewRecipeButton"
+	preview_button.text = "预览配方"
+	preview_button.custom_minimum_size = Vector2(170, 54)
+	preview_button.add_theme_font_size_override("font_size", 20)
+	preview_button.pressed.connect(_on_preview_pressed)
+	action_column.add_child(preview_button)
+	craft_button = Button.new()
+	craft_button.name = "CraftButton"
+	craft_button.text = "合成"
+	craft_button.custom_minimum_size = Vector2(170, 54)
+	craft_button.add_theme_font_size_override("font_size", 21)
+	craft_button.disabled = true
+	craft_button.pressed.connect(_on_crafting_output_pressed)
+	action_column.add_child(craft_button)
+	crafting_status = Label.new()
+	crafting_status.text = "放入材料后点击预览"
+	crafting_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	crafting_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	crafting_status.add_theme_font_size_override("font_size", 16)
+	action_column.add_child(crafting_status)
 
+	var output_column := VBoxContainer.new()
+	output_column.add_theme_constant_override("separation", 8)
+	crafting_row.add_child(output_column)
+	var output_label := Label.new()
+	output_label.text = "成品预览"
+	output_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	output_label.add_theme_font_size_override("font_size", 20)
+	output_column.add_child(output_label)
 	var output_slot := _create_crafting_button(-1)
 	crafting_output_button = output_slot["button"] as Button
 	crafting_output_button.name = "CraftingOutput"
-	crafting_output_button.pressed.connect(_on_crafting_output_pressed)
+	crafting_output_button.disabled = true
 	crafting_output_icon = output_slot["icon"] as TextureRect
 	crafting_output_count = output_slot["count"] as Label
-	crafting_row.add_child(crafting_output_button)
+	output_column.add_child(crafting_output_button)
 
 
 func _create_crafting_button(index: int) -> Dictionary:
 	var button := Button.new()
 	button.name = "CraftingInput%d" % index
-	button.custom_minimum_size = SLOT_SIZE
+	button.custom_minimum_size = CRAFT_SLOT_SIZE
 	button.focus_mode = Control.FOCUS_NONE
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.pressed.connect(_on_crafting_slot_pressed.bind(index))
 	var icon := TextureRect.new()
-	icon.position = Vector2(9, 8)
-	icon.size = Vector2(38, 38)
+	icon.position = Vector2(13, 11)
+	icon.size = Vector2(56, 56)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(icon)
 	var count := Label.new()
-	count.position = Vector2(4, 31)
-	count.size = Vector2(47, 21)
+	count.position = Vector2(8, 51)
+	count.size = Vector2(64, 25)
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	count.add_theme_font_size_override("font_size", 15)
+	count.add_theme_font_size_override("font_size", 18)
 	count.add_theme_color_override("font_shadow_color", Color.BLACK)
 	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(count)
@@ -266,8 +328,8 @@ func _create_slot_button(index: int, is_hotbar: bool) -> Dictionary:
 	panel.add_child(button)
 
 	var icon := TextureRect.new()
-	icon.position = Vector2(9, 8)
-	icon.size = Vector2(38, 38)
+	icon.position = Vector2(10, 9)
+	icon.size = Vector2(48, 48)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -275,11 +337,11 @@ func _create_slot_button(index: int, is_hotbar: bool) -> Dictionary:
 	button.add_child(icon)
 
 	var count := Label.new()
-	count.position = Vector2(4, 31)
-	count.size = Vector2(47, 21)
+	count.position = Vector2(6, 43)
+	count.size = Vector2(55, 23)
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	count.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	count.add_theme_font_size_override("font_size", 15)
+	count.add_theme_font_size_override("font_size", 17)
 	count.add_theme_color_override("font_color", Color.WHITE)
 	count.add_theme_color_override("font_shadow_color", Color.BLACK)
 	count.add_theme_constant_override("shadow_offset_x", 1)
@@ -292,7 +354,7 @@ func _create_slot_button(index: int, is_hotbar: bool) -> Dictionary:
 		key_label.text = str(index + 1)
 		key_label.position = Vector2(4, 1)
 		key_label.size = Vector2(18, 18)
-		key_label.add_theme_font_size_override("font_size", 12)
+		key_label.add_theme_font_size_override("font_size", 14)
 		key_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		button.add_child(key_label)
 	return {"panel": panel, "button": button, "icon": icon, "count": count}
@@ -365,6 +427,18 @@ func _on_crafting_slot_pressed(index: int) -> void:
 	_refresh_selection_styles()
 
 
+func _on_preview_pressed() -> void:
+	if crafting_grid.preview_recipe():
+		crafting_status.text = "已找到配方，可以合成"
+		inventory_title.text = "配方预览：%s ×%d" % [
+			ItemCatalog.display_name(crafting_grid.output_item()),
+			crafting_grid.output_amount(),
+		]
+	else:
+		crafting_status.text = "没有匹配的配方"
+		inventory_title.text = "预览失败：请调整2×2材料"
+
+
 func _on_crafting_output_pressed() -> void:
 	var result_item := crafting_grid.output_item()
 	var result_amount := crafting_grid.output_amount()
@@ -373,8 +447,10 @@ func _on_crafting_output_pressed() -> void:
 			ItemCatalog.display_name(result_item),
 			result_amount,
 		]
+		crafting_status.text = "材料已变化，请重新预览"
 	else:
-		inventory_title.text = "无法合成：请检查配方或背包空间"
+		inventory_title.text = "无法合成：请先预览配方并检查背包空间"
+		crafting_status.text = "需要先成功预览"
 
 
 func _refresh_crafting_slots() -> void:
@@ -383,12 +459,14 @@ func _refresh_crafting_slots() -> void:
 		crafting_icons[index].texture = load(ItemCatalog.icon_path(item_id)) as Texture2D if item_id != PlayerInventory.EMPTY_ITEM else null
 		crafting_counts[index].text = str(crafting_grid.get_amount(index)) if crafting_grid.get_amount(index) > 0 else ""
 	_on_crafting_output_changed(crafting_grid.output_item(), crafting_grid.output_amount())
+	crafting_status.text = "材料已变化，点击“预览配方”"
 
 
 func _on_crafting_output_changed(item_id: int, amount: int) -> void:
 	crafting_output_icon.texture = load(ItemCatalog.icon_path(item_id)) as Texture2D if item_id != PlayerInventory.EMPTY_ITEM else null
 	crafting_output_count.text = str(amount) if amount > 0 else ""
-	crafting_output_button.disabled = item_id == PlayerInventory.EMPTY_ITEM
+	crafting_output_button.disabled = true
+	craft_button.disabled = item_id == PlayerInventory.EMPTY_ITEM
 
 
 func _refresh_slot(index: int) -> void:
