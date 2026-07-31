@@ -6,6 +6,7 @@ var day_night_cycle: DayNightCycle
 var block_audio_manager: BlockAudioManager
 var inventory: PlayerInventory
 var crafting_grid: CraftingGrid
+var animal_spawner: AnimalSpawner
 
 
 func _ready() -> void:
@@ -36,6 +37,12 @@ func _ready() -> void:
 	player.inventory = inventory
 	player.position = world.spawn_world_position()
 	add_child(player)
+
+	animal_spawner = AnimalSpawner.new()
+	animal_spawner.name = "Animals"
+	animal_spawner.world = world
+	animal_spawner.player = player
+	add_child(animal_spawner)
 
 	var hud := GameHUD.new()
 	hud.name = "HUD"
