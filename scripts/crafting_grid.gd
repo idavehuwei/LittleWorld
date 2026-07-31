@@ -13,6 +13,7 @@ var recipe_book := RecipeBook.new()
 var item_ids := PackedInt32Array()
 var amounts := PackedInt32Array()
 var matched_recipe: CraftingRecipe
+var previewed_recipe: CraftingRecipe
 
 
 func _init(player_inventory: PlayerInventory) -> void:
@@ -33,11 +34,22 @@ func get_amount(index: int) -> int:
 
 
 func output_item() -> int:
-	return matched_recipe.result_item if matched_recipe != null else EMPTY
+	return previewed_recipe.result_item if previewed_recipe != null else EMPTY
 
 
 func output_amount() -> int:
-	return matched_recipe.result_amount if matched_recipe != null else 0
+	return previewed_recipe.result_amount if previewed_recipe != null else 0
+
+
+func has_preview() -> bool:
+	return previewed_recipe != null
+
+
+func preview_recipe() -> bool:
+	matched_recipe = recipe_book.find_match(_grid_item_pattern())
+	previewed_recipe = matched_recipe
+	output_changed.emit(output_item(), output_amount())
+	return previewed_recipe != null
 
 
 func move_one_from_inventory(inventory_slot: int, grid_slot: int) -> bool:
@@ -81,10 +93,14 @@ func set_slot_for_test(index: int, item_id: int, amount: int) -> void:
 
 
 func craft_once() -> bool:
-	if matched_recipe == null:
+	if previewed_recipe == null:
 		return false
-	var result_item := matched_recipe.result_item
-	var result_amount := matched_recipe.result_amount
+	matched_recipe = recipe_book.find_match(_grid_item_pattern())
+	if matched_recipe == null or matched_recipe.id != previewed_recipe.id:
+		_invalidate_preview()
+		return false
+	var result_item := previewed_recipe.result_item
+	var result_amount := previewed_recipe.result_amount
 	# 先验证输出可完整进入背包，再扣材料，保证合成是原子操作。
 	if not inventory.can_add(result_item, result_amount):
 		return false
@@ -123,12 +139,16 @@ func _grid_item_pattern() -> PackedInt32Array:
 
 
 func _refresh_match() -> void:
-	var previous_item := output_item()
-	var previous_amount := output_amount()
 	matched_recipe = recipe_book.find_match(_grid_item_pattern())
+	_invalidate_preview()
 	grid_changed.emit()
-	if previous_item != output_item() or previous_amount != output_amount():
-		output_changed.emit(output_item(), output_amount())
+
+
+func _invalidate_preview() -> void:
+	var had_preview := previewed_recipe != null
+	previewed_recipe = null
+	if had_preview:
+		output_changed.emit(EMPTY, 0)
 
 
 func _can_consume_match() -> bool:
