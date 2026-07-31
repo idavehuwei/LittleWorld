@@ -12,7 +12,7 @@ func _ready() -> void:
 	world = VoxelWorld.new()
 	world.name = "VoxelWorld"
 	add_child(world)
-	world.build_flat_world(50, 50)
+	world.build_initial_world()
 
 	player = FirstPersonPlayer.new()
 	player.name = "Player"

@@ -7,6 +7,11 @@ const DIRT := 1
 const STONE := 2
 const PLANKS := 3
 
+const WORLD_WIDTH := 250
+const WORLD_DEPTH := 250
+const BLOCK_SIZE := 1.0
+const GROUND_CELL_Y := 0
+
 const BLOCK_NAMES := {
 	GRASS: "草方块",
 	DIRT: "泥土",
@@ -25,30 +30,45 @@ var highlight: MeshInstance3D
 
 
 func _ready() -> void:
-	cell_size = Vector3.ONE
+	cell_size = Vector3.ONE * BLOCK_SIZE
+	# GridMap 默认开启 cell_center_y，cell y=0 的中心会自动位于 y=0.5，
+	# 因此 1 米方块无需移动就严格占据世界空间 y=0 到 y=1。
 	mesh_library = _create_block_library()
 	collision_layer = 1
 	collision_mask = 1
 	_create_highlight()
 
 
+func build_initial_world() -> void:
+	build_flat_world(WORLD_WIDTH, WORLD_DEPTH)
+
+
 func build_flat_world(width: int, depth: int) -> void:
+	clear()
 	var start_x: int = -width / 2
 	var start_z: int = -depth / 2
 	for x: int in range(start_x, start_x + width):
 		for z: int in range(start_z, start_z + depth):
-			set_cell_item(Vector3i(x, 0, z), GRASS)
+			set_cell_item(Vector3i(x, GROUND_CELL_Y, z), GRASS)
+
+
+func get_block(cell: Vector3i) -> int:
+	return get_cell_item(cell)
+
+
+func has_block(cell: Vector3i) -> bool:
+	return get_block(cell) != AIR
 
 
 func remove_block(cell: Vector3i) -> bool:
-	if get_cell_item(cell) == AIR:
+	if not has_block(cell):
 		return false
 	set_cell_item(cell, AIR)
 	return true
 
 
 func place_block(cell: Vector3i, block_type: int) -> bool:
-	if get_cell_item(cell) != AIR:
+	if has_block(cell):
 		return false
 	if not BLOCK_NAMES.has(block_type):
 		return false
